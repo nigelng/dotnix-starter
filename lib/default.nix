@@ -12,12 +12,17 @@ let
     root: hostName:
     let
       userPath = "${root}/config/user.json";
+      examplePath = "${root}/config/user.json.example";
       profile =
         if builtins.pathExists userPath then
           loadJson userPath
+        else if builtins.pathExists examplePath then
+          builtins.trace "loadUserConfig: ${userPath} not found — using placeholder values from ${examplePath}." (
+            loadJson examplePath
+          )
         else
           builtins.throw ''
-            loadUserConfig: ${userPath} not found.
+            loadUserConfig: neither ${userPath} nor ${examplePath} found.
             Copy config/user.json.example to config/user.json and edit with your details.
           '';
       host = loadHostConfig root hostName;

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nigelng/dotnix-starter/config/schema/host.schema.json",
+  "title": "nix-darwin host config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "description",
+    "adminUsername",
+    "machineType",
+    "computerName",
+    "hostName",
+    "screenshotFolder",
+    "homebrewPrefix",
+    "homebrewCleanup",
+    "trustedUsers",
+    "allowedUsers"
+  ],
+  "properties": {
+    "description": { "type": "string", "minLength": 1 },
+    "adminUsername": { "type": "string", "minLength": 1 },
+    "machineType": { "type": "string", "enum": ["laptop", "macmini"] },
+    "computerName": { "type": "string", "minLength": 1 },
+    "hostName": { "type": "string", "minLength": 1 },
+    "screenshotFolder": { "type": "string", "minLength": 1 },
+    "homebrewPrefix": { "type": "string", "minLength": 1 },
+    "homebrewCleanup": {
+      "type": "string",
+      "enum": ["none", "check", "uninstall", "zap"]
+    },
+    "trustedUsers": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "allowedUsers": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "extraSessionPaths": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "knownNetworkServices": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    }
+  }
+}

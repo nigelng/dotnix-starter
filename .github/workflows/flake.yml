@@ -1,0 +1,88 @@
+name: Flake check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: flake-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      hosts: ${{ steps.hosts.outputs.hosts }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Derive host matrix from config/hosts.json
+        id: hosts
+        run: |
+          hosts=$(jq -c '.hosts' config/hosts.json)
+          echo "hosts=$hosts" >> "$GITHUB_OUTPUT"
+
+  eval:
+    runs-on: macos-14
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v19
+
+      - name: Verify host JSON scaffolding
+        run: |
+          set -euo pipefail
+          nix develop --command bash -euc './scripts/validate-host-json.sh'
+
+      - name: Evaluate flake (no build)
+        run: nix flake check --no-build --option warn-dirty false
+
+  fmt:
+    runs-on: macos-14
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v19
+
+      - name: Check Nix formatting
+        run: git ls-files -z '*.nix' | xargs -0 nix fmt -- --check
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Run shellcheck
+        run: shellcheck scripts/*.sh build-darwin.sh
+
+  check:
+    needs:
+      - eval
+      - setup
+    runs-on: macos-14
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        host: ${{ fromJSON(needs.setup.outputs.hosts) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v19
+
+      - name: Build host check
+        run: nix build --option warn-dirty false '.#checks.aarch64-darwin.${{ matrix.host }}'

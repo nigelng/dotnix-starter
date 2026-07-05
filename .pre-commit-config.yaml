@@ -1,0 +1,13 @@
+repos:
+  - repo: local
+    hooks:
+      - id: nix-fmt
+        name: nix fmt check
+        entry: nix fmt -- --check
+        language: system
+        files: \.nix$
+      - id: shellcheck
+        name: shellcheck
+        entry: shellcheck
+        language: system
+        files: ^(scripts/.*\.sh|build-darwin\.sh)$

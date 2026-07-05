@@ -1,0 +1,12 @@
+{
+  "description": "Example Mac configuration",
+  "machineType": "laptop",
+  "computerName": "example-mac",
+  "hostName": "example-mac",
+  "adminUsername": "youruser",
+  "screenshotFolder": "~/Desktop/Screenshots",
+  "homebrewPrefix": "/opt/homebrew",
+  "homebrewCleanup": "zap",
+  "trustedUsers": [],
+  "allowedUsers": ["youruser"]
+}

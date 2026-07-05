@@ -1,0 +1,8 @@
+# Copy to ~/.config/ghostty/local.conf (optional).
+# This file is not managed by Nix — edit freely.
+#
+#   cp ~/.nix/home/config_files/ghostty_local.conf.example ~/.config/ghostty/local.conf
+#
+# Settings here override config.d/nix.conf from the flake.
+font-size = 14
+font-family = Meslo Lg Nerd Font

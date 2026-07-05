@@ -1,0 +1,9 @@
+{
+  "system": ["jq", "wget"],
+  "mas": {},
+  "taps": [],
+  "trustedCasks": {},
+  "brews": ["mas"],
+  "casks": [],
+  "user": ["fd"]
+}

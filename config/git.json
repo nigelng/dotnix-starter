@@ -1,0 +1,14 @@
+{
+  "includes": [],
+  "ignores": [
+    ".DS_Store",
+    ".env",
+    ".direnv",
+    "node_modules",
+    "dist/",
+    "tmp/",
+    "*.log",
+    "*.swp",
+    "*~"
+  ]
+}

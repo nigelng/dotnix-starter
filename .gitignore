@@ -1,0 +1,18 @@
+darwin/result
+result
+
+# Secrets and local env (use 1Password / sops-nix instead of committing)
+.env
+.env.*
+secrets/
+*.pem
+*.key
+
+# User-specific config (copy from .example files)
+config/user.json
+
+# IDE and tooling
+.idea/
+.devin/
+.vscode/
+.cursor/

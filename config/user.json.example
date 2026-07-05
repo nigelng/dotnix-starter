@@ -1,0 +1,7 @@
+{
+  "name": "Your Name",
+  "email": "you@example.com",
+  "defaultGpgKey": "<gpg-key-id>",
+  "defaultSigningKey": "<ssh-ed25519-key>",
+  "ghTokenOpItemId": "<op-item-id>"
+}

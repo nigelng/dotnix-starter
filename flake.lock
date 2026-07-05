@@ -1,0 +1,105 @@
+{
+  "nodes": {
+    "darwin": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1781772065,
+        "narHash": "sha256-xIbRSwDB1GBAUsWsQZUjudGfAGQt3BOpsWaO/ugVa4w=",
+        "owner": "LnL7",
+        "repo": "nix-darwin",
+        "rev": "adda04f0bf4819575b1978c2f8d78401b3c2be12",
+        "type": "github"
+      },
+      "original": {
+        "owner": "LnL7",
+        "ref": "nix-darwin-26.05",
+        "repo": "nix-darwin",
+        "type": "github"
+      }
+    },
+    "eslint-config": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1783262650,
+        "narHash": "sha256-5vzL6AbTcnqJ0xWgyFd87c88aeBgU6XIPeANXZg3z9E=",
+        "owner": "nigelng",
+        "repo": "eslint-config",
+        "rev": "9b9e36c011213968594d8bbdf048c20fe75c882d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nigelng",
+        "repo": "eslint-config",
+        "type": "github"
+      }
+    },
+    "home-manager": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1783221248,
+        "narHash": "sha256-ESQnuNHEDChsB4IxoLRhscVahqkDWkTb+qdIz8euYt4=",
+        "owner": "nix-community",
+        "repo": "home-manager",
+        "rev": "af2beae5f0fae0a4310cc0e6aef2572f56090353",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "ref": "release-26.05",
+        "repo": "home-manager",
+        "type": "github"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1783148766,
+        "narHash": "sha256-uslt2pqShTIXDdAHRHv2QkYLsVdY8Oqwz0EA48/RSM8=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "a50de1b7d8a586adc18d2395c19de7d6058e6030",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-26.05",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "prettier-config": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1783261371,
+        "narHash": "sha256-/OFCtFULcAIYhzn1akC+SUy2V9OxYIS/Y1sEzaFC1vI=",
+        "owner": "nigelng",
+        "repo": "prettier-config",
+        "rev": "d6ad2f874c5b9a11603899621112df18af9df4a1",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nigelng",
+        "repo": "prettier-config",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "darwin": "darwin",
+        "eslint-config": "eslint-config",
+        "home-manager": "home-manager",
+        "nixpkgs": "nixpkgs",
+        "prettier-config": "prettier-config"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}

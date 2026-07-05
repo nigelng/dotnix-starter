@@ -1,0 +1,41 @@
+name: Update flake inputs
+
+on:
+  schedule:
+    # Mondays 08:00 UTC
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v19
+
+      - name: Update lock file
+        run: nix flake update
+
+      - name: Verify flake
+        run: nix flake check
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "chore: update flake inputs"
+          title: "chore: update flake inputs"
+          body: |
+            Automated `nix flake update` from the weekly workflow.
+
+            Review `flake.lock` diff and merge when CI passes.
+          branch: automation/flake-update
+          delete-branch: true
+          labels: dependencies

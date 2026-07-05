@@ -8,6 +8,8 @@ let
     gitConfig = loadJson "${root}/config/git.json";
   };
 
+  loadRawHostConfig = root: hostName: loadJson "${root}/config/hosts/${hostName}.json";
+
   loadUserConfig =
     root: hostName:
     let
@@ -25,7 +27,7 @@ let
             loadUserConfig: neither ${userPath} nor ${examplePath} found.
             Copy config/user.json.example to config/user.json and edit with your details.
           '';
-      host = loadHostConfig root hostName;
+      host = loadRawHostConfig root hostName;
     in
     if host ? adminUsername then
       profile // { user = host.adminUsername; }
@@ -71,7 +73,7 @@ let
   loadHostConfig =
     root: hostName:
     let
-      raw = loadJson "${root}/config/hosts/${hostName}.json";
+      raw = loadRawHostConfig root hostName;
     in
     if !(raw ? machineType) then
       builtins.throw ''
@@ -120,6 +122,7 @@ in
 {
   inherit
     loadJson
+    loadRawHostConfig
     loadSharedConfig
     loadUserConfig
     loadAppConfig

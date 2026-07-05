@@ -12,6 +12,7 @@
   system,
   gitConfig,
   editorTooling,
+  extraHomeModules ? [ ],
   ...
 }:
 
@@ -68,7 +69,9 @@ lib.genAttrs hosts (
             mkWritableCopyActivation
             ;
         };
-        home-manager.users.${userConfig.user} = import ../home;
+        home-manager.users.${userConfig.user} = {
+          imports = [ (import ../home) ] ++ extraHomeModules;
+        };
       }
     ];
   }

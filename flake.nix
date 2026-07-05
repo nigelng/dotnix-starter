@@ -83,6 +83,20 @@
         else
           { };
 
+      mkWritableCopyActivation = import ./lib/mk-writable-copy-activation.nix {
+        hmLib = home-manager.lib;
+        inherit lib pkgs;
+      };
+
+      validateHostJsonScript = pkgs.writeShellApplication {
+        name = "validate-host-json";
+        runtimeInputs = [
+          pkgs.jq
+          pkgs.python3Packages.jsonschema
+        ];
+        text = builtins.readFile ./scripts/validate-host-json.sh;
+      };
+
       darwinConfigurations = import ./darwin {
         inherit (nixpkgs) lib;
         inherit pkgs;
@@ -159,6 +173,40 @@
     in
     {
       darwinConfigurations = darwinConfigurations;
+
+      # ── Thin-overlay exports ──────────────────────────────────────────
+      # These let overlay repos build darwinConfigurations using only the
+      # starter's exports + their own config/ JSON, without copying lib/,
+      # overlays/, scripts/, or darwin/default.nix.
+
+      # Config loaders (loadHostsManifest, loadSharedConfig, loadUserConfig,
+      # loadAppConfig, loadHostConfig, loadFontConfig).
+      lib = flakeLib;
+
+      # Built editor tooling attrset, or {} when inputs are absent.
+      editorTooling = editorTooling;
+
+      # Helper for writable-copy activation scripts (used by home/vscode.nix
+      # and home/zsh.nix via extraSpecialArgs).
+      mkWritableCopyActivation = mkWritableCopyActivation;
+
+      # The darwin/default.nix function — overlays call this with their own
+      # config loaders, host list, and extraHomeModules.
+      darwinConfigurationsBuilder = import ./darwin;
+
+      # Overlays needed by overlay repos for font resolution.
+      overlays.google-fonts = import ./overlays/google-fonts;
+
+      # nixpkgs with google-fonts overlay for validation in overlay checks.
+      pkgsForValidation = pkgsForValidation;
+
+      # App/font validation function for overlay checks.
+      validateApps = import ./lib/validate-apps.nix;
+
+      # Script derivations for overlay CI.
+      scripts.validateHostJson = validateHostJsonScript;
+
+      # ── Module exports ─────────────────────────────────────────────────
 
       # Reusable module exports for overlay repos.
       # homeModules.default imports the full home-manager module tree.

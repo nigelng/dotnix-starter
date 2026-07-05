@@ -231,25 +231,86 @@ See: `home/zsh.nix` (the `load_secret` example alias), `config/user.json.example
 
 ## Using as a flake overlay
 
-This template exposes `homeModules` and `darwinModules` as flake outputs so a private overlay repo can import and extend them.
+This template exposes `homeModules` and `darwinModules` as flake outputs so a private overlay repo can import and extend them. It also exports infrastructure (`lib`, `editorTooling`, `mkWritableCopyActivation`, `darwinConfigurationsBuilder`, `overlays.google-fonts`, `pkgsForValidation`, `validateApps`, `scripts.validateHostJson`) so overlay repos can build `darwinConfigurations` without copying any infrastructure files.
 
-**Available modules:**
+**Available exports:**
 
-| Output                        | Description                                                           |
-| ----------------------------- | --------------------------------------------------------------------- |
-| `homeModules.default`         | Full home-manager module tree (imports git, vim, vscode, zsh, editor) |
-| `homeModules.git`             | Just the git/gh config module                                         |
-| `homeModules.vim`             | Just the neovim config module                                         |
-| `homeModules.vscode`          | Just the VS Code/Cursor config module                                 |
-| `homeModules.zsh`             | Just the zsh config module                                            |
-| `homeModules.editor`          | Editor tooling (Prettier + ESLint from flake-pinned config repos)     |
-| `darwinModules.default`       | Combined configuration.nix + system.nix                               |
-| `darwinModules.configuration` | Just the nix-darwin system config module                              |
-| `darwinModules.system`        | Just the macOS defaults/networking module                             |
+| Output                        | Description                                                                                                                                          |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `homeModules.default`         | Full home-manager module tree (imports git, vim, vscode, zsh, editor)                                                                                |
+| `homeModules.git`             | Just the git/gh config module                                                                                                                        |
+| `homeModules.vim`             | Just the neovim config module                                                                                                                        |
+| `homeModules.vscode`          | Just the VS Code/Cursor config module                                                                                                                |
+| `homeModules.zsh`             | Just the zsh config module                                                                                                                           |
+| `homeModules.editor`          | Editor tooling (Prettier + ESLint from flake-pinned config repos)                                                                                    |
+| `darwinModules.default`       | Combined configuration.nix + system.nix                                                                                                              |
+| `darwinModules.configuration` | Just the nix-darwin system config module                                                                                                             |
+| `darwinModules.system`        | Just the macOS defaults/networking module                                                                                                            |
+| `lib`                         | Config loaders (`loadHostsManifest`, `loadSharedConfig`, `loadUserConfig`, `loadAppConfig`, `loadHostConfig`, `loadRawHostConfig`, `loadFontConfig`) |
+| `editorTooling`               | Built editor tooling attrset, or `{}` when inputs are absent                                                                                         |
+| `mkWritableCopyActivation`    | Helper for writable-copy activation scripts                                                                                                          |
+| `darwinConfigurationsBuilder` | The `darwin/default.nix` function — call with your own config loaders and `extraHomeModules`                                                         |
+| `overlays.google-fonts`       | The google-fonts nixpkgs overlay                                                                                                                     |
+| `pkgsForValidation`           | nixpkgs with google-fonts overlay for app/font validation                                                                                            |
+| `validateApps`                | App/font validation function for overlay checks                                                                                                      |
+| `scripts.validateHostJson`    | Shell derivation for host JSON schema validation in CI                                                                                               |
 
 Note: `homeModules.editor` is exported and wired to the flake-pinned `prettier-config` and `eslint-config` inputs. Overlay repos that don't provide those inputs should omit `homeModules.editor` from their imports.
 
-**Example overlay flake:**
+**Thin overlay example (recommended):**
+
+An overlay repo builds its `darwinConfigurations` using only the starter's exports + its own `config/` JSON and `home/personal.nix` — with zero copied infrastructure files:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
+    home-manager.url = "github:nix-community/home-manager/release-26.05";
+    darwin.url = "github:LnL7/nix-darwin/nix-darwin-26.05";
+    dotnix-starter.url = "github:nigelng/dotnix-starter";
+  };
+
+  outputs = { self, nixpkgs, home-manager, darwin, dotnix-starter, ... }@inputs:
+    let
+      inherit (nixpkgs) lib;
+      system = "aarch64-darwin";
+      pkgs = nixpkgs.legacyPackages.${system};
+
+      flakeLib = dotnix-starter.lib;
+      flakeRoot = builtins.toString self.outPath;
+      manifest = flakeLib.loadHostsManifest flakeRoot;
+      shared = flakeLib.loadSharedConfig flakeRoot;
+    in {
+      darwinConfigurations = dotnix-starter.darwinConfigurationsBuilder {
+        inherit (nixpkgs) lib pkgs;
+        inherit home-manager darwin system;
+        inherit (shared) gitConfig;
+        editorTooling = dotnix-starter.editorTooling;
+        hosts = manifest.hosts;
+        loadHostConfig = flakeLib.loadHostConfig flakeRoot;
+        loadAppConfig = flakeLib.loadAppConfig flakeRoot;
+        loadFontConfig = flakeLib.loadFontConfig flakeRoot;
+        loadUserConfig = flakeLib.loadUserConfig flakeRoot;
+        extraHomeModules = [ ./home/personal.nix ];
+      };
+
+      checks.${system} =
+        assert
+          (dotnix-starter.validateApps {
+            inherit lib;
+            pkgs = dotnix-starter.pkgsForValidation;
+            hosts = manifest.hosts;
+            loadAppConfig = flakeLib.loadAppConfig flakeRoot;
+            loadFontConfig = flakeLib.loadFontConfig flakeRoot;
+          }) == { };
+        lib.genAttrs manifest.hosts (host: self.darwinConfigurations.${host}.system);
+    };
+}
+```
+
+**Manual overlay example (module-level):**
+
+For overlays that need full control over `darwinSystem` modules:
 
 ```nix
 {
@@ -272,12 +333,6 @@ Note: `homeModules.editor` is exported and wired to the flake-pinned `prettier-c
     let
       system = "aarch64-darwin";
       pkgs = nixpkgs.legacyPackages.${system};
-
-      editorTooling = import ./lib/editor-tooling.nix {
-        inherit pkgs lib;
-        prettier-config = inputs.prettier-config;
-        eslint-config = inputs.eslint-config;
-      };
     in {
       darwinConfigurations.my-mac = darwin.lib.darwinSystem {
         inherit system;
@@ -287,7 +342,10 @@ Note: `homeModules.editor` is exported and wired to the flake-pinned `prettier-c
           {
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
-            home-manager.extraSpecialArgs = { inherit editorTooling; };
+            home-manager.extraSpecialArgs = {
+              editorTooling = dotnix-starter.editorTooling;
+              mkWritableCopyActivation = dotnix-starter.mkWritableCopyActivation;
+            };
             home-manager.users.myuser = dotnix-starter.homeModules.default;
           }
         ];
@@ -382,6 +440,7 @@ Linux runners cannot build this flake; CI must stay on macOS.
 
 ## Caveats
 
+- **Apple Silicon only.** The flake hardcodes `system = "aarch64-darwin"`. Intel Macs (`x86_64-darwin`) are not supported.
 - Only brews/casks listed in the merged app and font configs are installed when `homebrewCleanup` is `uninstall` or `zap`; extras are removed on switch.
 - **mas** = Mac App Store apps (IDs in `config/apps/base.json` and/or `config/apps/hosts/<host>.json`). Find existing app IDs with [mas-cli](https://github.com/mas-cli/mas).
 - [Trusted users](https://nixos.org/manual/nix/stable/command-ref/conf-file.html#conf-trusted-users) are the current user plus any listed in the host JSON. Default: `[<username>]`.

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Validate config/hosts/<host>.json against config/schema/host.schema.json.
+# Run from the repo root, or pass the repo root as $1.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="${1:-$PWD}"
 cd "$ROOT"
 
 schema="config/schema/host.schema.json"

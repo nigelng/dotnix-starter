@@ -133,7 +133,7 @@ in
       theme = ${theme.ghosttyTheme}
     '';
 
-    file.".p10k.zsh".source = ./config_files/p10k.zsh;
+    file.".p10k.zsh".source = lib.mkDefault ./config_files/p10k.zsh;
 
     stateVersion = "26.05";
     sessionPath = systemConfig.extraSessionPaths;

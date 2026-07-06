@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nigelng/dotnix-starter/config/schema/firefox.schema.json",
+  "title": "Firefox backup browser config",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "package": {
+      "type": "string",
+      "minLength": 1,
+      "description": "nixpkgs Firefox package attribute name (e.g. firefox-bin)."
+    },
+    "profileName": {
+      "type": "string",
+      "minLength": 1,
+      "description": "home-manager Firefox profile name."
+    },
+    "settings": {
+      "type": "object",
+      "description": "Firefox about:config preferences keyed by preference name.",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "boolean"
+        ]
+      }
+    },
+    "extensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "nix": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "AMO add-on slugs resolved at build time via fetchFirefoxAddon."
+        },
+        "manual": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "addonId",
+              "url",
+              "hash"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "addonId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "url": {
+                "type": "string",
+                "minLength": 1
+              },
+              "hash": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "Manually-specified XPI add-ons with URL and SRI hash."
+        }
+      }
+    }
+  }
+}

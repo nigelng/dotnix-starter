@@ -3,9 +3,11 @@
   lib,
   pkgs,
   hosts,
+  flakeRoot,
   loadHostConfig,
   loadAppConfig,
   loadFontConfig,
+  loadFirefoxConfig,
   loadUserConfig,
   home-manager,
   darwin,
@@ -22,6 +24,7 @@ lib.genAttrs hosts (
     systemConfig = loadHostConfig hostName;
     appConfig = loadAppConfig hostName;
     fontConfig = loadFontConfig hostName;
+    firefoxConfig = loadFirefoxConfig hostName;
     userConfig = loadUserConfig hostName;
     mkWritableCopyActivation = import ../lib/mk-writable-copy-activation.nix {
       hmLib = home-manager.lib;
@@ -36,6 +39,7 @@ lib.genAttrs hosts (
         systemConfig
         appConfig
         fontConfig
+        firefoxConfig
         userConfig
         ;
     };
@@ -66,11 +70,24 @@ lib.genAttrs hosts (
             userConfig
             gitConfig
             editorTooling
+            firefoxConfig
             mkWritableCopyActivation
             ;
         };
         home-manager.users.${userConfig.user} = {
-          imports = [ (import ../home) ] ++ extraHomeModules;
+          # The home module tree always includes firefox.nix so the module
+          # options are available. Firefox is only enabled by default when the
+          # standalone flake has config/firefox/base.json. Overlay repos without
+          # Firefox config get the mkEnableOption default (false) and can opt in
+          # by setting my.firefox.enable = true in extraHomeModules.
+          imports = [
+            (import ../home)
+            (import ../home/firefox.nix)
+          ]
+          ++ extraHomeModules;
+          my.firefox.enable = lib.mkIf (builtins.pathExists "${flakeRoot}/config/firefox/base.json") (
+            lib.mkDefault true
+          );
         };
       }
     ];

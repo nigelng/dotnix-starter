@@ -5,6 +5,7 @@
   hosts,
   loadAppConfig,
   loadFontConfig,
+  loadFirefoxConfig ? null,
 }:
 let
   missingPkgs = names: lib.filter (n: (pkgs.${n} or null) == null) names;
@@ -12,6 +13,18 @@ let
   missingNerdFonts = names: lib.filter (n: (pkgs.nerd-fonts.${n} or null) == null) names;
 
   missingGoogleFonts = names: lib.filter (n: (pkgs.${"google-fonts-" + n} or null) == null) names;
+
+  validateFirefoxPackage =
+    hostName:
+    if loadFirefoxConfig == null then
+      [ ]
+    else
+      let
+        firefoxConfig = loadFirefoxConfig hostName;
+      in
+      lib.optional ((pkgs.${firefoxConfig.package} or null) == null) ''
+        ${hostName}: unknown Firefox package: ${firefoxConfig.package}
+      '';
 
   validateHost =
     hostName:
@@ -33,7 +46,8 @@ let
         ''
         ++ lib.optional (missingGoogleFonts fontConfig.google != [ ]) ''
           ${hostName}: unknown google fonts: ${lib.concatStringsSep ", " (missingGoogleFonts fontConfig.google)}
-        '';
+        ''
+        ++ validateFirefoxPackage hostName;
     in
     if errors == [ ] then null else lib.concatStringsSep "\n" errors;
 

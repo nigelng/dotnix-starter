@@ -1,6 +1,8 @@
 # flake.nix
 #   ├── config/
 #   │   ├── apps/base.json, apps/hosts/<name>.json
+#   │   ├── fonts/base.json, fonts/hosts/<name>.json
+#   │   ├── firefox/base.json, firefox/hosts/<name>.json
 #   │   ├── user.json, git.json              # shared profile / git
 #   │   ├── hosts.json                       # host list + default
 #   │   └── hosts/<name>.json                # per-machine settings + adminUsername
@@ -112,6 +114,7 @@
         loadHostConfig = flakeLib.loadHostConfig flakeRoot;
         loadAppConfig = flakeLib.loadAppConfig flakeRoot;
         loadFontConfig = flakeLib.loadFontConfig flakeRoot;
+        loadFirefoxConfig = flakeLib.loadFirefoxConfig flakeRoot;
         loadUserConfig = flakeLib.loadUserConfig flakeRoot;
       };
 
@@ -180,7 +183,7 @@
       # overlays/, scripts/, or darwin/default.nix.
 
       # Config loaders (loadHostsManifest, loadSharedConfig, loadUserConfig,
-      # loadAppConfig, loadHostConfig, loadFontConfig).
+      # loadAppConfig, loadHostConfig, loadFontConfig, loadFirefoxConfig).
       lib = flakeLib;
 
       # Built editor tooling attrset, or {} when inputs are absent.
@@ -210,14 +213,22 @@
 
       # Reusable module exports for overlay repos.
       # homeModules.default imports the full home-manager module tree.
+      # homeModules.defaultWithFirefox also imports the Firefox backup browser.
       # Per-file modules let overlay repos pick individual pieces.
       homeModules = {
         default = import ./home;
+        defaultWithFirefox = {
+          imports = [
+            (import ./home)
+            (import ./home/firefox.nix)
+          ];
+        };
         git = import ./home/git.nix;
         vim = import ./home/vim.nix;
         vscode = import ./home/vscode.nix;
         zsh = import ./home/zsh.nix;
         editor = import ./home/editor.nix;
+        firefox = import ./home/firefox.nix;
       };
 
       # darwinModules.default combines configuration.nix + system.nix.
@@ -254,6 +265,7 @@
             hosts = manifest.hosts;
             loadAppConfig = flakeLib.loadAppConfig flakeRoot;
             loadFontConfig = flakeLib.loadFontConfig flakeRoot;
+            loadFirefoxConfig = flakeLib.loadFirefoxConfig flakeRoot;
           }) == { };
         lib.genAttrs manifest.hosts (host: darwinConfigurations.${host}.system)
         // lib.optionalAttrs (editorTooling != { }) {

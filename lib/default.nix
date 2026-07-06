@@ -116,6 +116,67 @@ let
       pkgs = mergeLists base host "pkgs";
     };
 
+  # Merge a base settings attrset with a host settings attrset (host wins per-key).
+  mergeSettings =
+    base: host:
+    let
+      baseSettings = objAttr base "settings";
+      hostSettings = objAttr host "settings";
+    in
+    baseSettings // hostSettings;
+
+  # Merge extensions: nix slugs and manual entries are additive (deduplicated).
+  mergeExtensions =
+    base: host:
+    let
+      baseExt = objAttr base "extensions";
+      hostExt = objAttr host "extensions";
+    in
+    {
+      nix = mergeLists baseExt hostExt "nix";
+      manual = mergeLists baseExt hostExt "manual";
+    };
+
+  loadFirefoxConfig =
+    root: hostName:
+    let
+      basePath = "${root}/config/firefox/base.json";
+    in
+    if !builtins.pathExists basePath then
+      # Overlay repos without Firefox get a no-op config.
+      # home/firefox.nix accepts firefoxConfig ? { } and my.firefox.enable
+      # defaults to false in overlays, so Firefox won't activate.
+      {
+        package = "firefox-bin";
+        profileName = "default";
+        settings = { };
+        extensions = {
+          nix = [ ];
+          manual = [ ];
+        };
+      }
+    else
+      let
+        hostPath = "${root}/config/firefox/hosts/${hostName}.json";
+        base = loadJson basePath;
+        host =
+          if builtins.pathExists hostPath then
+            loadJson hostPath
+          else
+            builtins.throw ''
+              loadFirefoxConfig: missing ${hostPath}
+              Add config/firefox/hosts/${hostName}.json for each entry in config/hosts.json (use {} if there are no host-only Firefox overrides).
+            '';
+        # Host package/profileName override base if present.
+        package = if host ? package then host.package else base.package or "firefox-bin";
+        profileName = if host ? profileName then host.profileName else base.profileName or "default";
+      in
+      {
+        inherit package profileName;
+        settings = mergeSettings base host;
+        extensions = mergeExtensions base host;
+      };
+
   loadHostsManifest = root: loadJson "${root}/config/hosts.json";
 
 in
@@ -128,6 +189,7 @@ in
     loadAppConfig
     loadHostConfig
     loadFontConfig
+    loadFirefoxConfig
     loadHostsManifest
     ;
 }

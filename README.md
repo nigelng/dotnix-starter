@@ -9,6 +9,7 @@ This template is designed to work standalone **and** as a flake overlay — a pr
 - **zsh** as the login shell
 - **Fonts**: `config/fonts/base.json` defines `pkgs` (nixpkgs-only, e.g. Font Awesome), `google` (e.g. Fira, Inter via `overlays/google-fonts`), and `nerd` (e.g. JetBrains Mono); per-host extras (including optional Homebrew font `casks`) in `config/fonts/hosts/<hostname>.json`
 - **[Ghostty](https://ghostty.org)** — Homebrew cask (`config/apps/base.json`); terminal font via nerd-font casks or pkgs in `config/fonts/`; Nix defaults generated from `home/themes/default.nix` into `~/.config/ghostty/config.d/nix.conf`; personal overrides in `~/.config/ghostty/local.conf` (see `home/config_files/ghostty_local.conf.example`)
+- **[Firefox](https://www.mozilla.org/firefox/)** — backup browser via `firefox-bin` with Dark Reader, 1Password, and AdGuard AdBlocker; privacy-hardened defaults (telemetry opt-out, DNS-over-HTTPS via Cloudflare, fingerprinting resistance); JSON-driven config in `config/firefox/` (see [Firefox (backup browser)](#firefox-backup-browser))
 - **btop** with Catppuccin Mocha theme
 
 **User-scope extras** (home-manager):
@@ -52,13 +53,15 @@ Uppercase `G*` shortcuts come from zimfw's `git` module (`zmodule git` in `home/
 | `config/apps/hosts/<name>.json`        | Per-host extras only (additive merge; lists deduplicated). Required for each host in `config/hosts.json`.                                                                                 |
 | `config/fonts/base.json`               | Fonts on every host: `pkgs`, `google`, `nerd` (optional `casks` per host in `config/fonts/hosts/<name>.json`)                                                                             |
 | `config/fonts/hosts/<name>.json`       | Per-host font extras only (additive merge). Required for each host in `config/hosts.json`.                                                                                                |
+| `config/firefox/base.json`             | Firefox backup browser defaults: `package`, `profileName`, `settings` (about:config), `extensions.nix` (AMO slugs)                                                                        |
+| `config/firefox/hosts/<name>.json`     | Per-host Firefox overrides (additive merge for extensions, per-key override for settings). Required for each host in `config/hosts.json`.                                                 |
 | `config/user.json` / `config/git.json` | Shared profile (name, email, GPG) and git settings. Copy `config/user.json.example` to `config/user.json`.                                                                                |
 | `config/hosts.json`                    | Hostnames to build (`hosts`, `defaultHost`)                                                                                                                                               |
 | `config/hosts/<name>.json`             | Per-machine settings: `adminUsername`, `machineType` (`laptop` \| `macmini`), Homebrew, nix trusted/allowed users, optional `extraSessionPaths`, optional `knownNetworkServices` override |
 | `overlays/google-fonts/`               | Nix overlay packaging fonts from [google/fonts](https://github.com/google/fonts)                                                                                                          |
 | `scripts/new-host.sh`                  | Interactive scaffold for a new host (also `nix run '.#new-host'`)                                                                                                                         |
 | `darwin/`                              | nix-darwin modules (`configuration.nix`, `system.nix`)                                                                                                                                    |
-| `home/`                                | home-manager modules (`git.nix`, `vim.nix`, `vscode.nix`, `zsh.nix`, …)                                                                                                                   |
+| `home/`                                | home-manager modules (`git.nix`, `vim.nix`, `vscode.nix`, `zsh.nix`, `firefox.nix`, …)                                                                                                    |
 
 **Pinned inputs** (see `flake.lock`):
 
@@ -127,8 +130,8 @@ If you omit the argument, `defaultHost` from `config/hosts.json` is used.
 
 ### Adding another Mac
 
-1. Run `nix run '.#new-host'` (or copy an existing host with `--copy-from`) to scaffold JSON under `config/hosts/`, `config/apps/hosts/`, and `config/fonts/hosts/`, and append the id to `config/hosts.json`.
-2. Edit the new host JSON files (`adminUsername`, `homebrewPrefix`, `homebrewCleanup`, host-only apps/fonts).
+1. Run `nix run '.#new-host'` (or copy an existing host with `--copy-from`) to scaffold JSON under `config/hosts/`, `config/apps/hosts/`, `config/fonts/hosts/`, and `config/firefox/hosts/`, and append the id to `config/hosts.json`.
+2. Edit the new host JSON files (`adminUsername`, `homebrewPrefix`, `homebrewCleanup`, host-only apps/fonts, Firefox overrides).
 3. `git add` the new paths (Nix only sees tracked files), then `nix run '.#check'`.
 4. On that machine: `nix run '.#switch' -- <new-host>`.
 
@@ -227,6 +230,95 @@ The `config/user.json.example` file also includes a `ghTokenOpItemId` field for 
 
 See: `home/zsh.nix` (the `load_secret` example alias), `config/user.json.example`.
 
+### Firefox (backup browser)
+
+[Mozilla Firefox](https://www.mozilla.org/firefox/) is installed as a backup browser via `firefox-bin` and home-manager `programs.firefox`. It ships with three AMO add-ons — **Dark Reader**, **1Password**, and **AdGuard AdBlocker** — plus a privacy-hardened profile (telemetry opt-out, DNS-over-HTTPS via Cloudflare, fingerprinting resistance, strict content blocking). The configuration is JSON-driven and extendable by both standalone users and overlay consumers.
+
+**Add-ons installed by default:**
+
+| Add-on            | AMO slug                         | Purpose                 |
+| ----------------- | -------------------------------- | ----------------------- |
+| Dark Reader       | `darkreader`                     | Dark mode for all sites |
+| 1Password         | `onepassword-x-password-manager` | Password manager        |
+| AdGuard AdBlocker | `adguard-adblocker`              | Ad/tracker blocking     |
+
+**Privacy/telemetry settings (in `config/firefox/base.json`):**
+
+| Category            | Key prefs                                                                                             | Effect                                                                                            |
+| ------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Telemetry opt-out   | `datareporting.*`, `toolkit.telemetry.*`, `app.shield.*`, `app.normandy.*`, `browser.crashReports.*`  | Disables all telemetry, health reports, Shield studies, auto crash submission                     |
+| DNS-over-HTTPS      | `network.trr.mode: 2`, `network.trr.uri: cloudflare-dns.com`, `network.trr.bootstrapAddress: 1.1.1.1` | DoH via Cloudflare (mode 2 = DoH first, fall back to system DNS; set `3` for DoH-only)            |
+| Fingerprinting      | `privacy.resistFingerprinting: true`, `media.peerconnection.ice.default_address_only: true`           | RFP spoofs common fingerprinting vectors; WebRTC uses default route only (prevents local IP leak) |
+| Content blocking    | `browser.contentblocking.category: strict`, `privacy.trackingprotection.enabled: true`                | Strict tracking protection (social media trackers, fingerprinters)                                |
+| Cookies & referrers | `network.cookie.cookieBehavior: 1` (block 3rd-party), `network.http.referer.XOriginPolicy: 2`         | Blocks third-party cookies; strips referrer to origin for cross-origin requests                   |
+| Other privacy       | `privacy.donottrackheader.enabled`, `privacy.query_stripping.enabled`, `network.dns.disablePrefetch`  | DNT header, tracking query param stripping, no DNS prefetch leaking                               |
+| Safe browsing       | `browser.safebrowsing.malware.enabled`, `browser.safebrowsing.phishing.enabled`                       | Keeps Google Safe Browsing malware/phishing protection on                                         |
+| Misc                | `extensions.pocket.enabled: false`, `browser.urlbar.speculativeConnect.enabled: false`                | Disables Pocket (removes built-in service that phones home); no speculative URL bar connections   |
+
+All settings are consumer-overridable via `my.firefox.settings` (Nix) or per-host JSON. See `config/firefox/base.json` for the full list.
+
+**JSON file layout:**
+
+| Path                                | Role                                                                                                      |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `config/firefox/base.json`          | Default Firefox package, profile name, `settings` (about:config prefs), and `extensions.nix` (AMO slugs)  |
+| `config/firefox/hosts/<name>.json`  | Per-host overrides (additive merge for extension lists, per-key override for settings). Use `{}` if none. |
+| `config/schema/firefox.schema.json` | JSON Schema for the Firefox config (validated by `scripts/validate-host-json.sh`)                         |
+
+**How extensions are installed:**
+
+By default (`my.firefox.useDeclarativeExtensions = false`), add-ons are installed via `home.file` symlinks that link each signed XPI from the Nix store into the Firefox profile's `extensions/` directory. This is reliable and idempotent on nix-darwin — unlike activation scripts, which may not run on first switch or get overwritten by Firefox on exit.
+
+To use home-manager's declarative extension path instead, set `my.firefox.useDeclarativeExtensions = true` in your overlay config. This wires `programs.firefox.profiles.<name>.extensions.packages` directly.
+
+**Overriding in an overlay:**
+
+The thin overlay path (`darwinConfigurationsBuilder`) includes the Firefox module but disables it by default when `config/firefox/base.json` doesn't exist. To enable Firefox in an overlay, either create `config/firefox/base.json` (which enables it automatically) or set `my.firefox.enable = true` in your `extraHomeModules`:
+
+```nix
+home-manager.users.myuser = {
+  imports = [ dotnix-starter.homeModules.firefox ];
+  my.firefox.enable = true;
+  # Override settings (replaces JSON defaults for these keys)
+  my.firefox.settings = {
+    "browser.startup.homepage" = "https://example.com";
+  };
+  # Add extra nixpkgs/NUR extension packages
+  my.firefox.nixExtensions = [ someAddonPkg ];
+  # Use declarative extensions instead of home.file symlinks
+  my.firefox.useDeclarativeExtensions = true;
+};
+```
+
+**Adding non-AMO extensions:**
+
+Consumers can add custom XPI add-ons via `my.firefox.manualExtensions` (or the JSON `extensions.manual` array). Each entry requires `name`, `addonId`, `url`, and `hash` (SRI format):
+
+```nix
+my.firefox.manualExtensions = [
+  {
+    name = "my-custom-addon";
+    addonId = "my-addon@example.com";
+    url = "https://example.com/my-addon.xpi";
+    hash = "sha256-AAAA...";
+  }
+];
+```
+
+**Existing Firefox profile migration:**
+
+Home-manager will back up any existing files in `~/Library/Application Support/Firefox/Profiles/` to `.hm-bak` on the first switch (via `home-manager.backupFileExtension`). The first switch uses a fresh Nix-managed profile. To keep your existing profile data:
+
+1. Before switching: back up your profile manually (e.g. `cp -r ~/Library/Application\ Support/Firefox/Profiles ~/firefox-profile-backup`).
+2. After the first switch: copy bookmarks, saved logins, and other profile data from your backup into the new Nix-managed profile directory.
+3. Firefox Sync / Firefox Account is not configured by this template — sign in manually if you use Sync.
+
+**Verifying add-ons:**
+
+After switching, launch Firefox and open `about:addons` to confirm Dark Reader, 1Password, and AdGuard AdBlocker are installed and enabled. Open `about:config` to verify the settings from `config/firefox/base.json`.
+
+See: `home/firefox.nix`, `home/firefox/addons.nix`, `config/firefox/base.json`.
+
 ---
 
 ## Using as a flake overlay
@@ -235,25 +327,27 @@ This template exposes `homeModules` and `darwinModules` as flake outputs so a pr
 
 **Available exports:**
 
-| Output                        | Description                                                                                                                                          |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `homeModules.default`         | Full home-manager module tree (imports git, vim, vscode, zsh, editor)                                                                                |
-| `homeModules.git`             | Just the git/gh config module                                                                                                                        |
-| `homeModules.vim`             | Just the neovim config module                                                                                                                        |
-| `homeModules.vscode`          | Just the VS Code/Cursor config module                                                                                                                |
-| `homeModules.zsh`             | Just the zsh config module                                                                                                                           |
-| `homeModules.editor`          | Editor tooling (Prettier + ESLint from flake-pinned config repos)                                                                                    |
-| `darwinModules.default`       | Combined configuration.nix + system.nix                                                                                                              |
-| `darwinModules.configuration` | Just the nix-darwin system config module                                                                                                             |
-| `darwinModules.system`        | Just the macOS defaults/networking module                                                                                                            |
-| `lib`                         | Config loaders (`loadHostsManifest`, `loadSharedConfig`, `loadUserConfig`, `loadAppConfig`, `loadHostConfig`, `loadRawHostConfig`, `loadFontConfig`) |
-| `editorTooling`               | Built editor tooling attrset, or `{}` when inputs are absent                                                                                         |
-| `mkWritableCopyActivation`    | Helper for writable-copy activation scripts                                                                                                          |
-| `darwinConfigurationsBuilder` | The `darwin/default.nix` function — call with your own config loaders and `extraHomeModules`                                                         |
-| `overlays.google-fonts`       | The google-fonts nixpkgs overlay                                                                                                                     |
-| `pkgsForValidation`           | nixpkgs with google-fonts overlay for app/font validation                                                                                            |
-| `validateApps`                | App/font validation function for overlay checks                                                                                                      |
-| `scripts.validateHostJson`    | Shell derivation for host JSON schema validation in CI                                                                                               |
+| Output                           | Description                                                                                                                                                               |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `homeModules.default`            | Full home-manager module tree (imports git, vim, vscode, zsh, editor)                                                                                                     |
+| `homeModules.defaultWithFirefox` | Full home-manager module tree plus the Firefox backup browser module                                                                                                      |
+| `homeModules.git`                | Just the git/gh config module                                                                                                                                             |
+| `homeModules.vim`                | Just the neovim config module                                                                                                                                             |
+| `homeModules.vscode`             | Just the VS Code/Cursor config module                                                                                                                                     |
+| `homeModules.zsh`                | Just the zsh config module                                                                                                                                                |
+| `homeModules.editor`             | Editor tooling (Prettier + ESLint from flake-pinned config repos)                                                                                                         |
+| `homeModules.firefox`            | Just the Firefox backup browser module (opt-in via `my.firefox.enable`)                                                                                                   |
+| `darwinModules.default`          | Combined configuration.nix + system.nix                                                                                                                                   |
+| `darwinModules.configuration`    | Just the nix-darwin system config module                                                                                                                                  |
+| `darwinModules.system`           | Just the macOS defaults/networking module                                                                                                                                 |
+| `lib`                            | Config loaders (`loadHostsManifest`, `loadSharedConfig`, `loadUserConfig`, `loadAppConfig`, `loadHostConfig`, `loadRawHostConfig`, `loadFontConfig`, `loadFirefoxConfig`) |
+| `editorTooling`                  | Built editor tooling attrset, or `{}` when inputs are absent                                                                                                              |
+| `mkWritableCopyActivation`       | Helper for writable-copy activation scripts                                                                                                                               |
+| `darwinConfigurationsBuilder`    | The `darwin/default.nix` function — call with your own config loaders and `extraHomeModules`                                                                              |
+| `overlays.google-fonts`          | The google-fonts nixpkgs overlay                                                                                                                                          |
+| `pkgsForValidation`              | nixpkgs with google-fonts overlay for app/font validation                                                                                                                 |
+| `validateApps`                   | App/font validation function for overlay checks                                                                                                                           |
+| `scripts.validateHostJson`       | Shell derivation for host JSON schema validation in CI                                                                                                                    |
 
 Note: `homeModules.editor` is exported and wired to the flake-pinned `prettier-config` and `eslint-config` inputs. Overlay repos that don't provide those inputs should omit `homeModules.editor` from their imports.
 
@@ -290,6 +384,7 @@ An overlay repo builds its `darwinConfigurations` using only the starter's expor
         loadHostConfig = flakeLib.loadHostConfig flakeRoot;
         loadAppConfig = flakeLib.loadAppConfig flakeRoot;
         loadFontConfig = flakeLib.loadFontConfig flakeRoot;
+        loadFirefoxConfig = flakeLib.loadFirefoxConfig flakeRoot;
         loadUserConfig = flakeLib.loadUserConfig flakeRoot;
         extraHomeModules = [ ./home/personal.nix ];
       };
@@ -302,6 +397,7 @@ An overlay repo builds its `darwinConfigurations` using only the starter's expor
             hosts = manifest.hosts;
             loadAppConfig = flakeLib.loadAppConfig flakeRoot;
             loadFontConfig = flakeLib.loadFontConfig flakeRoot;
+            loadFirefoxConfig = flakeLib.loadFirefoxConfig flakeRoot;
           }) == { };
         lib.genAttrs manifest.hosts (host: self.darwinConfigurations.${host}.system);
     };
@@ -333,6 +429,7 @@ For overlays that need full control over `darwinSystem` modules:
     let
       system = "aarch64-darwin";
       pkgs = nixpkgs.legacyPackages.${system};
+      flakeRoot = builtins.toString self.outPath;
     in {
       darwinConfigurations.my-mac = darwin.lib.darwinSystem {
         inherit system;
@@ -345,6 +442,7 @@ For overlays that need full control over `darwinSystem` modules:
             home-manager.extraSpecialArgs = {
               editorTooling = dotnix-starter.editorTooling;
               mkWritableCopyActivation = dotnix-starter.mkWritableCopyActivation;
+              firefoxConfig = dotnix-starter.lib.loadFirefoxConfig flakeRoot;
             };
             home-manager.users.myuser = dotnix-starter.homeModules.default;
           }
@@ -427,7 +525,7 @@ To cache Nix store paths on GitHub Actions, add a [Cachix](https://www.cachix.or
 
 GitHub Actions on `macos-14` (Apple Silicon):
 
-- **Evaluate flake** — verifies every host in `config/hosts.json` has matching JSON under `config/hosts/`, `config/apps/hosts/`, and `config/fonts/hosts/`; validates each host JSON against `config/schema/host.schema.json`; then `nix flake check --no-build` (includes app/font package name validation).
+- **Evaluate flake** — verifies every host in `config/hosts.json` has matching JSON under `config/hosts/`, `config/apps/hosts/`, `config/fonts/hosts/`, and `config/firefox/hosts/`; validates each host JSON against `config/schema/host.schema.json` and Firefox JSON against `config/schema/firefox.schema.json`; then `nix flake check --no-build` (includes app/font package name validation).
 - **Nix formatting** — dedicated job: `nix fmt -- --check` on all tracked `*.nix` files.
 - **Per-host build** (`.github/workflows/flake.yml`) — matrix derived from `config/hosts.json`: builds `.#checks.aarch64-darwin.<host>`.
 - **shellcheck** — `scripts/*.sh` and `build-darwin.sh` on Ubuntu.

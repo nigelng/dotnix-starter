@@ -15,7 +15,7 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 validate_with_python() {
-  python3 - "$schema" "$1" <<'PY'
+  python3 - "$1" "$2" <<'PY'
 import json
 import sys
 
@@ -41,6 +41,25 @@ if errors:
 PY
 }
 
+validate_firefox() {
+  firefox_schema="config/schema/firefox.schema.json"
+  # Skip Firefox validation entirely if the base config doesn't exist
+  # (overlay repos may not use Firefox).
+  if [[ ! -f "config/firefox/base.json" ]]; then
+    return 0
+  fi
+  for path in \
+    "config/firefox/base.json" \
+    "config/firefox/hosts/${1}.json"; do
+    if [[ ! -f "$path" ]]; then
+      echo "Missing required Firefox config: $path" >&2
+      exit 1
+    fi
+    jq -e . "$path" >/dev/null
+    validate_with_python "$firefox_schema" "$path"
+  done
+}
+
 for host in $(jq -r '.hosts[]' "$manifest"); do
   for path in \
     "config/hosts/${host}.json" \
@@ -53,7 +72,8 @@ for host in $(jq -r '.hosts[]' "$manifest"); do
   done
   host_json="config/hosts/${host}.json"
   jq -e . "$host_json" >/dev/null
-  validate_with_python "$host_json"
+  validate_with_python "$schema" "$host_json"
+  validate_firefox "$host"
 done
 
 echo "Host JSON schema validation passed."

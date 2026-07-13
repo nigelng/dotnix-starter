@@ -1,0 +1,188 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Semver bump type
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      recover:
+        description: Recover orphan release (changelog header exists, tag missing)
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard — main branch only
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Release workflow must be dispatched from the main branch."
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          token: ${{ secrets.WORKFLOW_PAT || github.token }}
+          persist-credentials: true
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install git-cliff
+        env:
+          GIT_CLIFF_VERSION: v2.7.0
+        run: |
+          set -euo pipefail
+          asset="git-cliff-${GIT_CLIFF_VERSION#v}-x86_64-unknown-linux-gnu.tar.gz"
+          base="https://github.com/orhun/git-cliff/releases/download/${GIT_CLIFF_VERSION}"
+          curl -fsSL "${base}/${asset}" -o "${asset}"
+          curl -fsSL "${base}/${asset}.sha512" -o "${asset}.sha512"
+          sha512sum -c "${asset}.sha512"
+          tar -xzf "${asset}"
+          install -m 0755 "git-cliff-${GIT_CLIFF_VERSION#v}/git-cliff" /usr/local/bin/git-cliff
+          git-cliff --version
+
+      - name: Resolve release version
+        id: version
+        run: |
+          set -euo pipefail
+          prev="$(./scripts/release-changelog.sh --print-prev-tag)"
+          next="$(./scripts/release-changelog.sh --bump "$prev" "${{ inputs.bump }}")"
+          {
+            echo "prev_tag=$prev"
+            echo "next_tag=$next"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check release state
+        id: state
+        env:
+          RECOVER: ${{ inputs.recover }}
+        run: |
+          set -euo pipefail
+          tag="${{ steps.version.outputs.next_tag }}"
+
+          ./scripts/release-changelog.sh --check-orphans "$tag" "$RECOVER"
+
+          header=false
+          if ./scripts/release-changelog.sh --header-exists "$tag"; then
+            header=true
+          fi
+
+          tag_exists=false
+          if ./scripts/release-changelog.sh --tag-exists "$tag"; then
+            tag_exists=true
+          fi
+
+          if [[ "$header" == true && "$tag_exists" == true ]]; then
+            echo "::error::Release ${tag} is already published (changelog header and tag exist)."
+            exit 1
+          fi
+
+          if [[ "$tag_exists" == true && "$header" == false ]]; then
+            echo "::error::Tag ${tag} exists without a matching changelog header."
+            exit 1
+          fi
+
+          if [[ "$header" == true && "$tag_exists" == false && "$RECOVER" != true ]]; then
+            echo "::error::Partial release detected for ${tag}. Re-dispatch with recover: true."
+            exit 1
+          fi
+
+          if [[ "$RECOVER" == true && "$header" == false ]]; then
+            echo "::error::recover: true requires an existing changelog header for ${tag}."
+            exit 1
+          fi
+
+          orphan=false
+          if [[ "$header" == true && "$tag_exists" == false && "$RECOVER" == true ]]; then
+            orphan=true
+          fi
+          echo "orphan=$orphan" >> "$GITHUB_OUTPUT"
+
+      - name: Update CHANGELOG
+        if: steps.state.outputs.orphan != 'true'
+        run: |
+          set -euo pipefail
+          prev="${{ steps.version.outputs.prev_tag }}"
+          tag="${{ steps.version.outputs.next_tag }}"
+          ./scripts/release-changelog.sh --since "$prev" --version "$tag" --prepend > release-body.md
+
+      - name: Commit release changelog
+        if: steps.state.outputs.orphan != 'true'
+        run: |
+          set -euo pipefail
+          tag="${{ steps.version.outputs.next_tag }}"
+          if git diff --quiet CHANGELOG.md; then
+            echo "::error::CHANGELOG.md unchanged after generation."
+            exit 1
+          fi
+          git add CHANGELOG.md
+          git commit -m "docs(release): ${tag} [skip ci]"
+
+      - name: Push release commit to main
+        if: steps.state.outputs.orphan != 'true'
+        id: push
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.next_tag }}
+          PREV_TAG: ${{ steps.version.outputs.prev_tag }}
+        run: |
+          set -euo pipefail
+          if git push origin HEAD:main; then
+            echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "::warning::Push rejected; rebasing onto main and retrying once."
+          if git log -1 --format='%s' | grep -qF "docs(release): ${RELEASE_TAG}"; then
+            git reset --soft HEAD~1
+            git restore --staged CHANGELOG.md
+            git checkout -- CHANGELOG.md
+          fi
+          git pull --rebase origin main
+          ./scripts/release-changelog.sh --since "$PREV_TAG" --version "$RELEASE_TAG" --prepend > release-body.md
+          git add CHANGELOG.md
+          git commit -m "docs(release): ${RELEASE_TAG} [skip ci]"
+          git push origin HEAD:main
+          echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve orphan release
+        if: steps.state.outputs.orphan == 'true'
+        id: recover
+        run: |
+          set -euo pipefail
+          tag="${{ steps.version.outputs.next_tag }}"
+          ./scripts/release-changelog.sh --extract-section "$tag" > release-body.md
+          if [[ ! -s release-body.md ]]; then
+            echo "::error::Could not extract changelog section for ${tag}."
+            exit 1
+          fi
+          commit_sha="$(./scripts/release-changelog.sh --release-commit-sha "$tag")"
+          echo "commit_sha=$commit_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.next_tag }}
+          target_commitish: ${{ steps.state.outputs.orphan == 'true' && steps.recover.outputs.commit_sha || steps.push.outputs.commit_sha }}
+          body_path: release-body.md
+          draft: false
+          token: ${{ secrets.WORKFLOW_PAT || github.token }}

@@ -1,0 +1,45 @@
+{
+  "package": "firefox-bin",
+  "profileName": "default",
+  "settings": {
+    "app.normandy.api_url": "",
+    "app.normandy.enabled": false,
+    "app.shield.optoutstudies.enabled": false,
+    "breakpad.reportURL": "",
+    "browser.contentblocking.category": "strict",
+    "browser.crashReports.unsubmittedCheck.enabled": false,
+    "browser.safebrowsing.malware.enabled": true,
+    "browser.safebrowsing.phishing.enabled": true,
+    "browser.tabs.crashReporting.sendReport": false,
+    "browser.urlbar.speculativeConnect.enabled": false,
+    "datareporting.healthreport.uploadEnabled": false,
+    "datareporting.policy.dataSubmissionEnabled": false,
+    "extensions.autoDisableScopes": 0,
+    "extensions.enabledScopes": 15,
+    "extensions.pocket.enabled": false,
+    "extensions.update.autoUpdateDefault": false,
+    "extensions.update.enabled": false,
+    "media.peerconnection.ice.default_address_only": true,
+    "network.cookie.cookieBehavior": 1,
+    "network.dns.disablePrefetch": true,
+    "network.http.referer.XOriginPolicy": 2,
+    "network.trr.bootstrapAddress": "1.1.1.1",
+    "network.trr.mode": 2,
+    "network.trr.uri": "https://cloudflare-dns.com/dns-query",
+    "privacy.donottrackheader.enabled": true,
+    "privacy.query_stripping.enabled": true,
+    "privacy.resistFingerprinting": true,
+    "privacy.trackingprotection.enabled": true,
+    "toolkit.telemetry.archive.enabled": false,
+    "toolkit.telemetry.enabled": false,
+    "toolkit.telemetry.unified": false
+  },
+  "extensions": {
+    "nix": [
+      "darkreader",
+      "onepassword-x-password-manager",
+      "adguard-adblocker"
+    ],
+    "manual": []
+  }
+}

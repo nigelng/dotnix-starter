@@ -6,6 +6,8 @@ on:
     paths-ignore:
       - 'CHANGELOG.md'
   pull_request:
+    paths-ignore:
+      - 'CHANGELOG.md'
 
 concurrency:
   group: flake-${{ github.workflow }}-${{ github.ref }}

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nigelng/dotnix-starter/config/schema/android.schema.json",
+  "title": "Android SDK config",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "enable": {
+      "type": "boolean",
+      "description": "Opt-in per host. Intended for config/android/hosts/<host>.json only, not base.json."
+    },
+    "avdHome": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Directory for Android Virtual Devices (ANDROID_AVD_HOME)."
+    },
+    "guiSdkSymlink": {
+      "type": "boolean",
+      "description": "Symlink ~/Library/Android/sdk to the Nix-managed SDK root."
+    },
+    "avdDefaultSymlink": {
+      "type": "boolean",
+      "description": "Symlink ~/.android/avd to avdHome."
+    },
+    "jdkPackage": {
+      "type": "string",
+      "minLength": 1,
+      "description": "nixpkgs attribute name for the JDK package (e.g. jdk, jdk17)."
+    }
+  }
+}

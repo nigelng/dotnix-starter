@@ -43,6 +43,7 @@ Creates:
   config/apps/hosts/<id>.json
   config/fonts/hosts/<id>.json
   config/firefox/hosts/<id>.json
+  config/android/hosts/<id>.json   (when config/android/base.json exists)
   updates config/hosts.json
 
 Options:
@@ -199,6 +200,13 @@ if [[ -n "$COPY_FROM" ]]; then
   else
     FIREFOX_HOST_CONFIG='{}'
   fi
+  if [[ -f "config/android/base.json" ]]; then
+    if [[ -f "config/android/hosts/${COPY_FROM}.json" ]]; then
+      ANDROID_HOST_CONFIG="$(jq '.' "config/android/hosts/${COPY_FROM}.json")"
+    else
+      ANDROID_HOST_CONFIG='{"enable":false}'
+    fi
+  fi
 else
   prompt DESCRIPTION "Description" "${HOST_ID} configuration"
   prompt ADMIN_USER "adminUsername (macOS admin username)" "$(whoami)"
@@ -235,6 +243,9 @@ else
   APPS_CONFIG='{}'
   FONTS_HOST_CONFIG='{}'
   FIREFOX_HOST_CONFIG='{}'
+  if [[ -f "config/android/base.json" ]]; then
+    ANDROID_HOST_CONFIG='{"enable":false}'
+  fi
 fi
 
 if [[ -z "${SET_DEFAULT:-}" ]]; then
@@ -242,17 +253,24 @@ if [[ -z "${SET_DEFAULT:-}" ]]; then
 fi
 
 mkdir -p config/hosts config/apps/hosts config/fonts/hosts config/firefox/hosts
+if [[ -f "config/android/base.json" ]]; then
+  mkdir -p config/android/hosts
+fi
 
 HOST_FILE="config/hosts/${HOST_ID}.json"
 APPS_FILE="config/apps/hosts/${HOST_ID}.json"
 FONTS_FILE="config/fonts/hosts/${HOST_ID}.json"
 FIREFOX_FILE="config/firefox/hosts/${HOST_ID}.json"
+ANDROID_FILE="config/android/hosts/${HOST_ID}.json"
 MANIFEST_FILE="config/hosts.json"
 
 echo "$HOST_CONFIG" | jq '.' >"$HOST_FILE"
 echo "$APPS_CONFIG" | jq '.' >"$APPS_FILE"
 echo "$FONTS_HOST_CONFIG" | jq '.' >"$FONTS_FILE"
 echo "$FIREFOX_HOST_CONFIG" | jq '.' >"$FIREFOX_FILE"
+if [[ -f "config/android/base.json" ]]; then
+  echo "$ANDROID_HOST_CONFIG" | jq '.' >"$ANDROID_FILE"
+fi
 
 if [[ "$(lower "${SET_DEFAULT:-}")" == y* ]]; then
   jq --arg h "$HOST_ID" '.defaultHost = $h | .hosts += [$h] | .hosts |= unique' \
@@ -269,6 +287,9 @@ echo "  $HOST_FILE"
 echo "  $APPS_FILE"
 echo "  $FONTS_FILE"
 echo "  $FIREFOX_FILE"
+if [[ -f "config/android/base.json" ]]; then
+  echo "  $ANDROID_FILE"
+fi
 echo "  updated $MANIFEST_FILE"
 echo
 echo "Next steps:"
@@ -276,6 +297,13 @@ echo "  1. Edit $HOST_FILE for machine settings (adminUsername, machineType, hom
 echo "  2. Edit $APPS_FILE for host-only apps (system, casks, mas, …)."
 echo "  3. Edit $FONTS_FILE for host-only fonts (pkgs, google, nerd, casks)."
 echo "  4. Edit $FIREFOX_FILE for host-only Firefox overrides (use {} if none)."
-echo "  5. git add config/hosts/${HOST_ID}.json config/apps/hosts/${HOST_ID}.json config/fonts/hosts/${HOST_ID}.json config/firefox/hosts/${HOST_ID}.json config/hosts.json"
-echo "  6. nix run '.#check'   # CI matrix is derived from config/hosts.json automatically"
-echo "  7. nix run '.#switch' -- ${HOST_ID}"
+if [[ -f "config/android/base.json" ]]; then
+  echo "  5. Edit $ANDROID_FILE for Android enable/disable (use { \"enable\": false } if off)."
+  echo "  6. git add config/hosts/${HOST_ID}.json config/apps/hosts/${HOST_ID}.json config/fonts/hosts/${HOST_ID}.json config/firefox/hosts/${HOST_ID}.json config/android/hosts/${HOST_ID}.json config/hosts.json"
+  echo "  7. nix run '.#check'   # CI matrix is derived from config/hosts.json automatically"
+  echo "  8. nix run '.#switch' -- ${HOST_ID}"
+else
+  echo "  5. git add config/hosts/${HOST_ID}.json config/apps/hosts/${HOST_ID}.json config/fonts/hosts/${HOST_ID}.json config/firefox/hosts/${HOST_ID}.json config/hosts.json"
+  echo "  6. nix run '.#check'   # CI matrix is derived from config/hosts.json automatically"
+  echo "  7. nix run '.#switch' -- ${HOST_ID}"
+fi

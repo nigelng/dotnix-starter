@@ -6,6 +6,7 @@
   loadAppConfig,
   loadFontConfig,
   loadFirefoxConfig ? null,
+  loadAndroidConfig ? null,
 }:
 let
   missingPkgs = names: lib.filter (n: (pkgs.${n} or null) == null) names;
@@ -25,6 +26,22 @@ let
       lib.optional ((pkgs.${firefoxConfig.package} or null) == null) ''
         ${hostName}: unknown Firefox package: ${firefoxConfig.package}
       '';
+
+  validateAndroidJdk =
+    hostName:
+    if loadAndroidConfig == null then
+      [ ]
+    else
+      let
+        androidConfig = loadAndroidConfig hostName;
+        jdkPackage = androidConfig.jdkPackage or "jdk";
+      in
+      if !(androidConfig.enable or false) then
+        [ ]
+      else
+        lib.optional ((pkgs.${jdkPackage} or null) == null) ''
+          ${hostName}: unknown Android JDK package: ${jdkPackage}
+        '';
 
   validateHost =
     hostName:
@@ -47,7 +64,8 @@ let
         ++ lib.optional (missingGoogleFonts fontConfig.google != [ ]) ''
           ${hostName}: unknown google fonts: ${lib.concatStringsSep ", " (missingGoogleFonts fontConfig.google)}
         ''
-        ++ validateFirefoxPackage hostName;
+        ++ validateFirefoxPackage hostName
+        ++ validateAndroidJdk hostName;
     in
     if errors == [ ] then null else lib.concatStringsSep "\n" errors;
 

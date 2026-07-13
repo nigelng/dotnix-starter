@@ -49,7 +49,8 @@ lib.genAttrs hosts (
     modules = [
       {
         nixpkgs.config.allowUnfree = true;
-        nixpkgs.config.android_sdk.accept_license = lib.mkIf androidConfig.enable true;
+        # Plain bool: nixpkgs android builder reads this as a raw attr, not a NixOS module option.
+        nixpkgs.config.android_sdk.accept_license = androidConfig.enable;
         nixpkgs.overlays = [
           (import ../overlays/google-fonts)
         ];

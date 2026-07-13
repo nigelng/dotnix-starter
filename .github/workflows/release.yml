@@ -12,10 +12,13 @@ on:
           - minor
           - major
       recover:
-        description: Recover orphan release (changelog header exists, tag missing)
+        description: Orphan recovery only — use "no" for normal releases
         required: true
-        type: boolean
-        default: false
+        type: choice
+        default: "no"
+        options:
+          - "no"
+          - "yes"
 
 permissions:
   contents: write
@@ -75,12 +78,24 @@ jobs:
       - name: Check release state
         id: state
         env:
-          RECOVER: ${{ inputs.recover }}
+          RECOVER_INPUT: ${{ inputs.recover }}
         run: |
           set -euo pipefail
           tag="${{ steps.version.outputs.next_tag }}"
 
-          ./scripts/release-changelog.sh --check-orphans "$tag" "$RECOVER"
+          recover=false
+          case "${RECOVER_INPUT,,}" in
+            yes | true | 1) recover=true ;;
+            no | false | 0 | "") recover=false ;;
+            *)
+              echo "::error::Invalid recover input: ${RECOVER_INPUT} (use no or yes)"
+              exit 1
+              ;;
+          esac
+          echo "recover=${recover}" >> "$GITHUB_OUTPUT"
+          echo "Release ${tag} (recover=${recover})" >> "$GITHUB_STEP_SUMMARY"
+
+          ./scripts/release-changelog.sh --check-orphans "$tag" "$recover"
 
           header=false
           if ./scripts/release-changelog.sh --header-exists "$tag"; then
@@ -102,18 +117,19 @@ jobs:
             exit 1
           fi
 
-          if [[ "$header" == true && "$tag_exists" == false && "$RECOVER" != true ]]; then
-            echo "::error::Partial release detected for ${tag}. Re-dispatch with recover: true."
+          if [[ "$header" == true && "$tag_exists" == false && "$recover" != true ]]; then
+            echo "::error::Partial release detected for ${tag}. Re-dispatch with recover: yes."
             exit 1
           fi
 
-          if [[ "$RECOVER" == true && "$header" == false ]]; then
-            echo "::error::recover: true requires an existing changelog header for ${tag}."
+          if [[ "$recover" == true && "$header" == false ]]; then
+            echo "::error::recover: yes requires an existing changelog header for ${tag}."
+            echo "::error::For a normal new release, set recover to no."
             exit 1
           fi
 
           orphan=false
-          if [[ "$header" == true && "$tag_exists" == false && "$RECOVER" == true ]]; then
+          if [[ "$header" == true && "$tag_exists" == false && "$recover" == true ]]; then
             orphan=true
           fi
           echo "orphan=$orphan" >> "$GITHUB_OUTPUT"

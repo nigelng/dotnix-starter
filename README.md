@@ -1,5 +1,7 @@
 # dotnix-starter
 
+[![Flake check](https://github.com/nigelng/dotnix-starter/actions/workflows/flake.yml/badge.svg)](https://github.com/nigelng/dotnix-starter/actions/workflows/flake.yml)
+
 Nix flake template for macOS (Apple Silicon): [nix-darwin](https://github.com/LnL7/nix-darwin) for the system and [home-manager](https://github.com/nix-community/home-manager) for user config. App lists: shared packages in `config/apps/base.json`, per-host extras in `config/apps/hosts/<hostname>.json` (merged at build time). Profile settings in `config/user.json`, git in `config/git.json`; per-machine settings (including `adminUsername`) in `config/hosts/<hostname>.json`.
 
 This template is designed to work standalone **and** as a flake overlay — a private repo can import `homeModules` and `darwinModules` from this flake and extend them with personal config (see [Using as a flake overlay](#using-as-a-flake-overlay)).
@@ -267,7 +269,7 @@ All settings are consumer-overridable via `my.firefox.settings` (Nix) or per-hos
 
 **How extensions are installed:**
 
-By default (`my.firefox.useDeclarativeExtensions = false`), add-ons are installed via `home.file` symlinks that link each signed XPI from the Nix store into the Firefox profile's `extensions/` directory. This is reliable and idempotent on nix-darwin — unlike activation scripts, which may not run on first switch or get overwritten by Firefox on exit.
+By default (`my.firefox.useDeclarativeExtensions = false`), add-ons are installed via `home.file` symlinks (`force = true`) into the Firefox profile's `extensions/` directory. A post-switch activation re-links each XPI and prints `ls -la` of that directory so extensions are restored if Firefox removed them since the last switch. `extensions.autoDisableScopes = 0` is set when add-ons are configured so sideloaded extensions stay enabled.
 
 To use home-manager's declarative extension path instead, set `my.firefox.useDeclarativeExtensions = true` in your overlay config. This wires `programs.firefox.profiles.<name>.extensions.packages` directly.
 

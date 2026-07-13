@@ -1,0 +1,60 @@
+# git-cliff configuration — Keep a Changelog format
+# https://git-cliff.org/docs/configuration
+
+[changelog]
+header = ""
+body = """
+{% if version -%}
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else -%}
+## [Unreleased]
+{% endif -%}
+{%- set breaking_changes = commits | filter(attribute="breaking", value=true) %}
+{%- if breaking_changes | length > 0 %}
+### Breaking
+{% for commit in breaking_changes %}
+- {% if commit.scope %}{{ commit.scope }}: {% endif %}{{ commit.message | split(pat="\n") | first | trim }}
+{% endfor %}
+{%- endif %}
+{% for group, group_commits in commits | group_by(attribute="group") %}
+### {{ group }}
+{% for commit in group_commits %}
+{%- if commit.breaking %}{% continue %}{% endif %}
+- {% if commit.scope %}{{ commit.scope }}: {% endif %}{{ commit.message | split(pat="\n") | first | trim }}
+{% endfor %}
+{% endfor %}
+"""
+footer = ""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+commit_parsers = [
+  { message = "^Merge pull request", skip = true },
+  { message = "^docs\\(release\\):", skip = true },
+  { message = "^build\\(deps\\):", skip = true },
+  { message = "^chore: update flake inputs$", skip = true },
+  { message = "^feat", group = "Added" },
+  { message = "^fix", group = "Fixed" },
+  { message = "^perf", group = "Changed" },
+  { message = "^refactor", group = "Changed" },
+  { message = "^style", group = "Changed" },
+  { message = "^docs", group = "Changed" },
+  { message = "^chore", group = "Changed" },
+  { message = "^ci", group = "Changed" },
+  { message = "^test", group = "Changed" },
+  { message = "^build", group = "Changed" },
+  { message = "^deprecate", group = "Deprecated" },
+  { message = "^remove", group = "Removed" },
+  { message = "^security", group = "Security" },
+]
+filter_commits = false
+protect_breaking_commits = true
+topo_order = false
+sort_commits = "oldest"
+tag_pattern = "v[0-9].*"
+
+[remote.github]
+owner = "nigelng"
+repo = "dotnix-starter"

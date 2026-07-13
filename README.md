@@ -517,6 +517,26 @@ pre-commit run --all-files
 
 Hooks (see `.pre-commit-config.yaml`): `nix fmt --check` on `*.nix`, `shellcheck` on `scripts/*.sh` and `build-darwin.sh`. Not required for CI.
 
+### Releasing
+
+Publish a semver release from **Actions → Release → Run workflow** on `main`. Choose `patch`, `minor`, or `major`. The workflow generates a Keep a Changelog section from conventional commits since the latest `v*` tag, commits it to `main` with `docs(release): vX.Y.Z [skip ci]`, creates the semver tag, and publishes a GitHub Release whose body is only the new section.
+
+**Preconditions:**
+
+- `main` should already be green — release commits skip the macOS flake CI by design (`[skip ci]` plus `paths-ignore` for `CHANGELOG.md`).
+- Keep **branch commit messages** conventional (`feat:`, `fix:`, etc.). `fix-pr-title.yml` enforces PR titles only; git-cliff reads the commits on the branch.
+- Auto-generated bullets are commit-derived drafts and may be noisier than hand-curated entries. Edit `CHANGELOG.md` before dispatching if you need polished notes (optional `notes` workflow input is a possible future enhancement).
+- The first release after merging the release workflow (`v1.0.1`) will include those workflow commits — expected.
+
+**Preview locally** (requires [git-cliff](https://git-cliff.org)):
+
+```sh
+git fetch --tags
+./scripts/release-changelog.sh --since v1.0.0 --version v1.0.1 --dry-run
+```
+
+**Orphan recovery:** If a changelog header was committed but tag/release creation failed, re-dispatch with `recover: true` (same bump type as the partial release). This tags the original `docs(release):` commit without duplicating the header.
+
 ### Faster CI (optional)
 
 To cache Nix store paths on GitHub Actions, add a [Cachix](https://www.cachix.org) cache and set `CACHIX_AUTH_TOKEN` in repo secrets, then extend `.github/workflows/flake.yml` with `cachix/cachix-action`.

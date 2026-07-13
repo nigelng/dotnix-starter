@@ -1,3 +1,7 @@
+# Opens a PR after `nix flake update`. Requires one of:
+#   1. Repo Settings → Actions → General → Workflow permissions →
+#      "Allow GitHub Actions to create and approve pull requests", or
+#   2. A `WORKFLOW_PAT` repo secret (fine-grained PAT: contents + pull-requests write).
 name: Update flake inputs
 
 on:
@@ -28,8 +32,11 @@ jobs:
         run: nix flake check
 
       - name: Open pull request
+        id: cpr
         uses: peter-evans/create-pull-request@v8
         with:
+          # PAT bypasses the "Actions may not create PRs" repo setting when set.
+          token: ${{ secrets.WORKFLOW_PAT || github.token }}
           commit-message: "chore: update flake inputs"
           title: "chore: update flake inputs"
           body: |
@@ -39,3 +46,16 @@ jobs:
           branch: automation/flake-update
           delete-branch: true
           labels: dependencies
+
+      - name: Report manual PR link when auto-create is blocked
+        if: steps.cpr.outcome == 'failure'
+        run: |
+          {
+            echo "::warning::GitHub Actions could not open a pull request."
+            echo "Enable **Allow GitHub Actions to create and approve pull requests** at:"
+            echo "https://github.com/${{ github.repository }}/settings/actions"
+            echo "Or add a \`WORKFLOW_PAT\` repository secret (contents + pull-requests write)."
+            echo "The update branch was still pushed — open a PR manually:"
+            echo "https://github.com/${{ github.repository }}/compare/main...automation/flake-update?expand=1"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1

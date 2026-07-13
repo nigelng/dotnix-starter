@@ -120,6 +120,12 @@ in
   };
 
   home = {
+    # Silence direnv loading/unloading lines so Powerlevel10k instant prompt
+    # does not warn about console I/O during zsh initialization.
+    sessionVariables = lib.optionalAttrs config.programs.direnv.enable {
+      DIRENV_LOG_FORMAT = "";
+    };
+
     file.".config/btop/themes/catppuccin_mocha.theme".source = ./themes/btop_catppuccin_mocha;
 
     # Ghostty: Nix defaults + optional user-editable local.conf (see ghostty_local.conf.example).

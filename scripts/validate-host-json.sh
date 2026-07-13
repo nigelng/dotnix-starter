@@ -60,6 +60,29 @@ validate_firefox() {
   done
 }
 
+validate_android() {
+  android_schema="config/schema/android.schema.json"
+  # Skip Android validation entirely if the base config doesn't exist
+  # (overlay repos may not use Android).
+  if [[ ! -f "config/android/base.json" ]]; then
+    return 0
+  fi
+  if jq -e 'has("enable")' "config/android/base.json" >/dev/null; then
+    echo "config/android/base.json must not contain \"enable\" (use hosts/<host>.json instead)" >&2
+    exit 1
+  fi
+  for path in \
+    "config/android/base.json" \
+    "config/android/hosts/${1}.json"; do
+    if [[ ! -f "$path" ]]; then
+      echo "Missing required Android config: $path" >&2
+      exit 1
+    fi
+    jq -e . "$path" >/dev/null
+    validate_with_python "$android_schema" "$path"
+  done
+}
+
 for host in $(jq -r '.hosts[]' "$manifest"); do
   for path in \
     "config/hosts/${host}.json" \
@@ -74,6 +97,7 @@ for host in $(jq -r '.hosts[]' "$manifest"); do
   jq -e . "$host_json" >/dev/null
   validate_with_python "$schema" "$host_json"
   validate_firefox "$host"
+  validate_android "$host"
 done
 
 echo "Host JSON schema validation passed."

@@ -8,6 +8,7 @@
   loadAppConfig,
   loadFontConfig,
   loadFirefoxConfig,
+  loadAndroidConfig ? (_: _: { enable = false; }),
   loadUserConfig,
   home-manager,
   darwin,
@@ -25,6 +26,7 @@ lib.genAttrs hosts (
     appConfig = loadAppConfig hostName;
     fontConfig = loadFontConfig hostName;
     firefoxConfig = loadFirefoxConfig hostName;
+    androidConfig = loadAndroidConfig hostName;
     userConfig = loadUserConfig hostName;
     mkWritableCopyActivation = import ../lib/mk-writable-copy-activation.nix {
       hmLib = home-manager.lib;
@@ -40,12 +42,14 @@ lib.genAttrs hosts (
         appConfig
         fontConfig
         firefoxConfig
+        androidConfig
         userConfig
         ;
     };
     modules = [
       {
         nixpkgs.config.allowUnfree = true;
+        nixpkgs.config.android_sdk.accept_license = lib.mkIf androidConfig.enable true;
         nixpkgs.overlays = [
           (import ../overlays/google-fonts)
         ];
@@ -71,6 +75,7 @@ lib.genAttrs hosts (
             gitConfig
             editorTooling
             firefoxConfig
+            androidConfig
             mkWritableCopyActivation
             ;
         };
@@ -83,11 +88,13 @@ lib.genAttrs hosts (
           imports = [
             (import ../home)
             (import ../home/firefox.nix)
+            (import ../home/android.nix)
           ]
           ++ extraHomeModules;
           my.firefox.enable = lib.mkIf (builtins.pathExists "${flakeRoot}/config/firefox/base.json") (
             lib.mkDefault true
           );
+          my.android.enable = lib.mkDefault androidConfig.enable;
         };
       }
     ];

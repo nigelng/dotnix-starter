@@ -3,9 +3,8 @@
 # JSON defaults (config/firefox/base.json) seed the my.firefox option defaults.
 # Overlay consumers can override any option (settings, extensions, package).
 # Extensions are installed via home.file symlinks into the profile's extensions/
-# directory (useDeclarativeExtensions = false, the default). This is reliable and
-# idempotent on nix-darwin, unlike activation scripts which may not run on first
-# switch or get overwritten by Firefox on exit.
+# directory (useDeclarativeExtensions = false, the default), with force = true and
+# a post-switch activation that re-links and lists the directory.
 {
   config,
   pkgs,
@@ -81,7 +80,13 @@ in
         id = 0;
         path = cfg.profileName;
         isDefault = true;
-        settings = cfg.settings;
+        settings =
+          cfg.settings
+          // lib.optionalAttrs (allAddonPkgs != [ ]) {
+            # home-manager documents this pref for store/XPI-installed extensions;
+            # without it Firefox may leave sideloaded add-ons disabled.
+            "extensions.autoDisableScopes" = 0;
+          };
       }
       // lib.optionalAttrs cfg.useDeclarativeExtensions {
         extensions.packages = allAddonPkgs;
@@ -89,16 +94,40 @@ in
     };
 
     # Default path: symlink each XPI into the profile's extensions/ directory
-    # via home.file. This is reliable and idempotent on nix-darwin, unlike
-    # activation scripts which may not run on first switch or get overwritten
-    # by Firefox on exit.
+    # via home.file. force = true re-applies symlinks if Firefox removed or
+    # replaced them since the last switch.
     home.file = lib.mkIf (!cfg.useDeclarativeExtensions) (
       builtins.listToAttrs (
         map (pkg: {
           name = "${firefoxExtensionsDir}/${pkg.passthru.extid}.xpi";
-          value.source = "${pkg}/${pkg.passthru.extid}.xpi";
+          value = {
+            source = "${pkg}/${pkg.passthru.extid}.xpi";
+            force = true;
+          };
         }) allAddonPkgs
       )
     );
+
+    # After home.file runs, re-link and list extensions so every switch repairs
+    # sideloaded XPIs and prints the profile extensions directory.
+    home.activation.ensureFirefoxExtensions =
+      lib.mkIf (!cfg.useDeclarativeExtensions && allAddonPkgs != [ ])
+        (
+          lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+            extensionsDir="$HOME/${firefoxExtensionsDir}"
+            mkdir -p "$extensionsDir"
+            ${lib.concatMapStrings (
+              pkg:
+              let
+                xpi = "${pkg}/${pkg.passthru.extid}.xpi";
+              in
+              ''
+                ln -sfn ${lib.escapeShellArg xpi} "$extensionsDir/${pkg.passthru.extid}.xpi"
+              ''
+            ) allAddonPkgs}
+            echo "Firefox extensions in $extensionsDir:"
+            ${pkgs.coreutils}/bin/ls -la "$extensionsDir"
+          ''
+        );
   };
 }

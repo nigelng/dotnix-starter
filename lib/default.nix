@@ -177,6 +177,46 @@ let
         extensions = mergeExtensions base host;
       };
 
+  loadAndroidConfig =
+    root: hostName:
+    let
+      basePath = "${root}/config/android/base.json";
+    in
+    if !builtins.pathExists basePath then
+      # Overlay repos without Android get a no-op config.
+      # home/android.nix applies module defaults for avdHome etc.
+      {
+        enable = false;
+      }
+    else
+      let
+        hostPath = "${root}/config/android/hosts/${hostName}.json";
+        base = loadJson basePath;
+      in
+      if base ? enable then
+        builtins.throw ''
+          loadAndroidConfig: config/android/base.json must not contain "enable" (use hosts/<host>.json instead).
+        ''
+      else
+        let
+          host =
+            if builtins.pathExists hostPath then
+              loadJson hostPath
+            else
+              builtins.throw ''
+                loadAndroidConfig: missing ${hostPath}
+                Add config/android/hosts/${hostName}.json for each entry in config/hosts.json (use { "enable": false } if Android is off for this host).
+              '';
+          merged = base // host;
+        in
+        {
+          enable = merged.enable or false;
+          avdHome = merged.avdHome or null;
+          guiSdkSymlink = merged.guiSdkSymlink or true;
+          avdDefaultSymlink = merged.avdDefaultSymlink or true;
+          jdkPackage = merged.jdkPackage or "jdk";
+        };
+
   loadHostsManifest = root: loadJson "${root}/config/hosts.json";
 
 in
@@ -190,6 +230,7 @@ in
     loadHostConfig
     loadFontConfig
     loadFirefoxConfig
+    loadAndroidConfig
     loadHostsManifest
     ;
 }

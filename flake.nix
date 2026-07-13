@@ -94,7 +94,7 @@
         name = "validate-host-json";
         runtimeInputs = [
           pkgs.jq
-          pkgs.python3Packages.jsonschema
+          (pkgs.python3.withPackages (ps: [ ps.jsonschema ]))
         ];
         text = builtins.readFile ./scripts/validate-host-json.sh;
       };
@@ -115,49 +115,8 @@
         loadAppConfig = flakeLib.loadAppConfig flakeRoot;
         loadFontConfig = flakeLib.loadFontConfig flakeRoot;
         loadFirefoxConfig = flakeLib.loadFirefoxConfig flakeRoot;
+        loadAndroidConfig = flakeLib.loadAndroidConfig flakeRoot;
         loadUserConfig = flakeLib.loadUserConfig flakeRoot;
-      };
-
-      switchApp = pkgs.writeShellApplication {
-        name = "darwin-switch";
-        runtimeInputs = [ pkgs.nix ];
-        text = ''
-          set -e
-          cd "${flakeRoot}"
-          HOST="''${1:-''${HOST:-${primaryHost}}}"
-          if command -v darwin-rebuild >/dev/null 2>&1; then
-            exec sudo darwin-rebuild switch --flake ".#''${HOST}"
-          fi
-          echo "First install: building system, then switching…"
-          nix build ".#darwinConfigurations.''${HOST}.system"
-          exec sudo ./result/sw/bin/darwin-rebuild switch --flake ".#''${HOST}"
-        '';
-      };
-
-      checkApp = pkgs.writeShellApplication {
-        name = "darwin-check";
-        runtimeInputs = [ pkgs.nix ];
-        text = ''
-          set -e
-          cd "${flakeRoot}"
-          exec nix --option warn-dirty false flake check
-        '';
-      };
-
-      changelogApp = pkgs.writeShellApplication {
-        name = "darwin-changelog";
-        runtimeInputs = [ pkgs.nix ];
-        text = ''
-          set -e
-          cd "${flakeRoot}"
-          HOST="''${1:-''${HOST:-${primaryHost}}}"
-          if command -v darwin-rebuild >/dev/null 2>&1; then
-            exec darwin-rebuild changelog --flake ".#''${HOST}"
-          fi
-          echo "darwin-rebuild not found. Building system, then showing changelog…"
-          nix build ".#darwinConfigurations.''${HOST}.system"
-          exec ./result/sw/bin/darwin-rebuild changelog --flake ".#''${HOST}"
-        '';
       };
 
       newHostApp = pkgs.writeShellApplication {
@@ -173,6 +132,22 @@
           exec ${./scripts/new-host.sh} "$@"
         '';
       };
+
+      overlayOutputs = import ./lib/overlay-flake-outputs.nix {
+        inherit
+          self
+          pkgs
+          lib
+          system
+          flakeRoot
+          manifest
+          primaryHost
+          darwinConfigurations
+          editorTooling
+          newHostApp
+          ;
+        dotnix-starter = self;
+      };
     in
     {
       darwinConfigurations = darwinConfigurations;
@@ -183,7 +158,8 @@
       # overlays/, scripts/, or darwin/default.nix.
 
       # Config loaders (loadHostsManifest, loadSharedConfig, loadUserConfig,
-      # loadAppConfig, loadHostConfig, loadFontConfig, loadFirefoxConfig).
+      # loadAppConfig, loadHostConfig, loadFontConfig, loadFirefoxConfig,
+      # loadAndroidConfig).
       lib = flakeLib;
 
       # Built editor tooling attrset, or {} when inputs are absent.
@@ -206,8 +182,14 @@
       # App/font validation function for overlay checks.
       validateApps = import ./lib/validate-apps.nix;
 
+      # Shared flake outputs helper for thin overlay repos.
+      overlayFlakeOutputs = import ./lib/overlay-flake-outputs.nix;
+
       # Script derivations for overlay CI.
-      scripts.validateHostJson = validateHostJsonScript;
+      scripts = {
+        validateHostJson = validateHostJsonScript;
+      }
+      // overlayOutputs.scripts;
 
       # ── Module exports ─────────────────────────────────────────────────
 
@@ -229,6 +211,7 @@
         zsh = import ./home/zsh.nix;
         editor = import ./home/editor.nix;
         firefox = import ./home/firefox.nix;
+        android = import ./home/android.nix;
       };
 
       # darwinModules.default combines configuration.nix + system.nix.
@@ -244,65 +227,19 @@
         system = import ./darwin/system.nix;
       };
 
-      formatter.${system} = pkgs.nixfmt;
+      formatter = overlayOutputs.formatter;
 
-      devShells.${system}.default = pkgs.mkShell {
-        packages = [
-          pkgs.jq
-          pkgs.nix
-          pkgs.nixfmt
-          pkgs.nodejs
-          pkgs.python3Packages.jsonschema
-          pkgs.shellcheck
-        ];
-      };
+      devShells = overlayOutputs.devShells;
 
-      checks.${system} =
-        assert
-          (import ./lib/validate-apps.nix {
-            inherit lib;
-            pkgs = pkgsForValidation;
-            hosts = manifest.hosts;
-            loadAppConfig = flakeLib.loadAppConfig flakeRoot;
-            loadFontConfig = flakeLib.loadFontConfig flakeRoot;
-            loadFirefoxConfig = flakeLib.loadFirefoxConfig flakeRoot;
-          }) == { };
-        lib.genAttrs manifest.hosts (host: darwinConfigurations.${host}.system)
-        // lib.optionalAttrs (editorTooling != { }) {
-          editor-tooling = editorTooling.editorTooling;
-        };
+      checks = overlayOutputs.checks;
 
-      apps.${system} = {
-        switch = {
+      apps.${system} = overlayOutputs.apps.${system} // {
+        validate-host-json = {
           type = "app";
-          program = "${switchApp}/bin/darwin-switch";
+          program = "${validateHostJsonScript}/bin/validate-host-json";
           meta = {
-            description = "Build and activate the nix-darwin system from this flake";
-            mainProgram = "darwin-switch";
-          };
-        };
-        check = {
-          type = "app";
-          program = "${checkApp}/bin/darwin-check";
-          meta = {
-            description = "Run nix flake check for this flake";
-            mainProgram = "darwin-check";
-          };
-        };
-        changelog = {
-          type = "app";
-          program = "${changelogApp}/bin/darwin-changelog";
-          meta = {
-            description = "Show nix-darwin stateVersion changelog before bumping system.stateVersion";
-            mainProgram = "darwin-changelog";
-          };
-        };
-        new-host = {
-          type = "app";
-          program = "${newHostApp}/bin/darwin-new-host";
-          meta = {
-            description = "Scaffold config for a new host (interactive prompts)";
-            mainProgram = "darwin-new-host";
+            description = "Validate config/hosts/*.json against JSON schemas";
+            mainProgram = "validate-host-json";
           };
         };
       };

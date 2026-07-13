@@ -535,7 +535,7 @@ git fetch --tags
 ./scripts/release-changelog.sh --since v1.0.0 --version v1.0.1 --dry-run
 ```
 
-**Orphan recovery:** If a changelog header was committed but tag/release creation failed, re-dispatch with `recover: true` (same bump type as the partial release). This tags the original `docs(release):` commit without duplicating the header.
+**Orphan recovery:** If a changelog header was committed but tag/release creation failed, re-dispatch with **recover: yes** (same bump type as the partial release). Use **recover: no** for all normal releases.
 
 ### Faster CI (optional)
 

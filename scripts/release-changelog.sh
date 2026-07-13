@@ -167,6 +167,13 @@ list_orphan_headers() {
   done < <(list_semver_headers)
 }
 
+is_truthy() {
+  case "${1,,}" in
+    yes | true | 1) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 check_orphan_headers() {
   local next_tag="$1"
   local recover="$2"
@@ -183,7 +190,7 @@ check_orphan_headers() {
     return 0
   fi
 
-  if [[ "$recover" == true ]]; then
+  if is_truthy "$recover"; then
     for o in "${orphans[@]}"; do
       if [[ "$o" == "$next_tag" ]]; then
         found=true

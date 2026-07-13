@@ -14,6 +14,22 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 1
 fi
 
+if [[ ! -f "$manifest" ]]; then
+  echo "Missing required host manifest: $manifest" >&2
+  exit 1
+fi
+
+if ! jq -e . "$manifest" >/dev/null; then
+  echo "Unreadable or invalid JSON: $manifest" >&2
+  exit 1
+fi
+
+mapfile -t hosts < <(jq -r '.hosts[]?' "$manifest")
+if [[ ${#hosts[@]} -eq 0 ]]; then
+  echo "No hosts listed in $manifest" >&2
+  exit 1
+fi
+
 validate_with_python() {
   python3 - "$1" "$2" <<'PY'
 import json
@@ -83,7 +99,7 @@ validate_android() {
   done
 }
 
-for host in $(jq -r '.hosts[]' "$manifest"); do
+for host in "${hosts[@]}"; do
   for path in \
     "config/hosts/${host}.json" \
     "config/apps/hosts/${host}.json" \

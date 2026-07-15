@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > Versions before 1.0.0 used date-only headers (no semver tag).
 
+## [Unreleased]
+
+### Fixed
+
+- Use registered `MesloLGMDZ Nerd Font Mono` for Ghostty/VS Code (`uiFont`) instead of invalid `Meslo Lg Nerd Font`
+
+### Changed
+
+- Install `meslo-lg` via `config/fonts/base.json`
+- Remove unused `home/config_files/ghostty_config` and unused `nerdFontKey` theme attr
+
 ## [1.0.1] - 2026-07-14
 
 ### Fixed

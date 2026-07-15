@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+
+
+## [1.0.2] - 2026-07-15
+
+
+### Fixed
+
+- ci: indent multiline string in release workflow YAML (#12)
+
+- fonts: use MesloLGMDZ Nerd Font Mono and install meslo-lg (#13)
+
+
 > Versions before 1.0.0 used date-only headers (no semver tag).
 
 ## [Unreleased]

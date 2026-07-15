@@ -5,4 +5,4 @@
 #
 # Settings here override config.d/nix.conf from the flake.
 font-size = 14
-font-family = Meslo Lg Nerd Font
+font-family = MesloLGMDZ Nerd Font Mono

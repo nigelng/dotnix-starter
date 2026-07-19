@@ -227,7 +227,7 @@ jobs:
           echo "commit_sha=$commit_sha" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.version.outputs.next_tag }}
           target_commitish: ${{ steps.state.outputs.orphan == 'true' && steps.recover.outputs.commit_sha || steps.push.outputs.commit_sha }}

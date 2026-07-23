@@ -12,7 +12,15 @@
 let
   cfg = config.my.android;
 
-  inherit (pkgs.androidenv.androidPkgs) androidsdk;
+  sdk = pkgs.androidenv.composeAndroidPackages {
+    platformVersions = cfg.platformVersions;
+    systemImageTypes = cfg.systemImageTypes;
+    abiVersions = cfg.abiVersions;
+    includeEmulator = true;
+    includeNDK = true;
+    includeSystemImages = true;
+  };
+  androidsdk = sdk.androidsdk;
   jdk = pkgs.${cfg.jdkPackage};
   sdkRoot = "${androidsdk}/libexec/android-sdk";
   # nixpkgs cmdline-tools layout can change across versions; pick the latest.
@@ -61,6 +69,24 @@ in
       type = lib.types.str;
       default = androidConfig.jdkPackage or "jdk";
       description = "nixpkgs attribute name for the JDK package (e.g. jdk, jdk17).";
+    };
+
+    platformVersions = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = androidConfig.platformVersions or [ "34" "35" ];
+      description = "Android API levels to include (e.g. [ \"35\" ]).";
+    };
+
+    systemImageTypes = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = androidConfig.systemImageTypes or [ "google_apis_playstore" ];
+      description = "System image types to include (google_apis or google_apis_playstore).";
+    };
+
+    abiVersions = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = androidConfig.abiVersions or [ "arm64-v8a" ];
+      description = "ABIs to include. arm64-v8a is sufficient for Apple Silicon.";
     };
   };
 

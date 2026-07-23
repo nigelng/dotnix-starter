@@ -18,16 +18,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > Versions before 1.0.0 used date-only headers (no semver tag).
 
-## [Unreleased]
+## [1.0.3] - 2026-07-23
 
-### Fixed
+### Added
 
-- Use registered `MesloLGMDZ Nerd Font Mono` for Ghostty/VS Code (`uiFont`) instead of invalid `Meslo Lg Nerd Font`
-
-### Changed
-
-- Install `meslo-lg` via `config/fonts/base.json`
-- Remove unused `home/config_files/ghostty_config` and unused `nerdFontKey` theme attr
+- `platformVersions`, `systemImageTypes`, and `abiVersions` options on `my.android` — replaces the default full SDK with `composeAndroidPackages` so overlay configs can pin specific API levels, image types, and ABIs (e.g. API 35 `google_apis_playstore` `arm64-v8a` only, ~4 GB vs ~63 GB)
 
 ## [1.0.1] - 2026-07-14
 

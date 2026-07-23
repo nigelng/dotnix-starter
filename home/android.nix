@@ -73,7 +73,11 @@ in
 
     platformVersions = lib.mkOption {
       type = lib.types.listOf lib.types.str;
-      default = androidConfig.platformVersions or [ "34" "35" ];
+      default =
+        androidConfig.platformVersions or [
+          "34"
+          "35"
+        ];
       description = "Android API levels to include (e.g. [ \"35\" ]).";
     };
 

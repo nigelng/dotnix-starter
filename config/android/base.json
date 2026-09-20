@@ -1,0 +1,5 @@
+{
+  "guiSdkSymlink": true,
+  "avdDefaultSymlink": true,
+  "jdkPackage": "jdk"
+}

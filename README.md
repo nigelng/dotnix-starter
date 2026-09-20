@@ -9,16 +9,16 @@ This template is designed to work standalone **and** as a flake overlay — a pr
 **Included:**
 
 - **zsh** as the login shell
-- **Fonts**: `config/fonts/base.json` defines `pkgs` (nixpkgs-only, e.g. Font Awesome), `google` (e.g. Fira, Inter via `overlays/google-fonts`), and `nerd` (e.g. JetBrains Mono); per-host extras (including optional Homebrew font `casks`) in `config/fonts/hosts/<hostname>.json`
-- **[Ghostty](https://ghostty.org)** — Homebrew cask (`config/apps/base.json`); terminal font via nerd-font casks or pkgs in `config/fonts/`; Nix defaults generated from `home/themes/default.nix` into `~/.config/ghostty/config.d/nix.conf`; personal overrides in `~/.config/ghostty/local.conf` (see `home/config_files/ghostty_local.conf.example`)
-- **[Firefox](https://www.mozilla.org/firefox/)** — backup browser via `firefox-bin` with Dark Reader, 1Password, and AdGuard AdBlocker; privacy-hardened defaults (telemetry opt-out, DNS-over-HTTPS via Cloudflare, fingerprinting resistance); JSON-driven config in `config/firefox/` (see [Firefox (backup browser)](#firefox-backup-browser))
+- **Fonts**: `config/fonts/base.json` defines `pkgs` (nixpkgs-only), `google` (via `overlays/google-fonts`), and `nerd` (starter ships `meslo-lg`); per-host extras (including optional Homebrew font `casks`) in `config/fonts/hosts/<hostname>.json`
+- **Ghostty config** — Nix defaults from `home/themes/default.nix` into `~/.config/ghostty/config.d/nix.conf`; personal overrides in `~/.config/ghostty/local.conf`. Install the Ghostty app yourself (e.g. add a Homebrew cask in apps JSON)
+- **[Firefox](https://www.mozilla.org/firefox/)** — backup browser via `firefox-bin` with Dark Reader, 1Password, and AdGuard AdBlocker; privacy-hardened defaults; JSON-driven config in `config/firefox/` (see [Firefox (backup browser)](#firefox-backup-browser))
 - **btop** with Catppuccin Mocha theme
 
 **User-scope extras** (home-manager):
 
 - **direnv** (with **nix-direnv**)
-- **git** / **ssh** (1Password agent) / **gpg**
-- **Visual Studio Code** and **Cursor** (`vscode`, `code-cursor` via nix-darwin; extensions and settings via `home/vscode.nix`)
+- **git** / **ssh** (1Password agent) / **gpg** (GPG agent for other uses; **commits sign with SSH** via 1Password — see Caveats)
+- **VS Code / Cursor modules** (`home/vscode.nix`) — add `vscode` / `code-cursor` (or install apps another way) via apps JSON when you want them managed by Nix
 - **[eza](https://eza.rocks)** (modern `ls` replacement)
 - **[fzf](https://github.com/junegunn/fzf)** (Catppuccin Mocha colors)
 - **[zoxide](https://github.com/ajeetdsouza/zoxide)**
@@ -26,6 +26,11 @@ This template is designed to work standalone **and** as a flake overlay — a pr
   - [gh-eco](https://github.com/jrnxf/gh-eco)
   - [gh-dash](https://github.com/dlvhdr/gh-dash)
   - [gh-markdown-preview](https://github.com/yusukebe/gh-markdown-preview)
+
+**Optional (JSON-driven):**
+
+- **Android SDK** — disabled by default (`config/android/`); enable per host (see [Android SDK](#android-sdk))
+- Homebrew casks / extra nixpkgs apps (Ghostty, editors, `_1password-cli`, …) via `config/apps/`
 
 **Zsh** is the default shell (in addition to system shells):
 
@@ -57,13 +62,18 @@ Uppercase `G*` shortcuts come from zimfw's `git` module (`zmodule git` in `home/
 | `config/fonts/hosts/<name>.json`       | Per-host font extras only (additive merge). Required for each host in `config/hosts.json`.                                                                                                |
 | `config/firefox/base.json`             | Firefox backup browser defaults: `package`, `profileName`, `settings` (about:config), `extensions.nix` (AMO slugs)                                                                        |
 | `config/firefox/hosts/<name>.json`     | Per-host Firefox overrides (additive merge for extensions, per-key override for settings). Required for each host in `config/hosts.json`.                                                 |
+| `config/android/base.json`             | Shared Android SDK defaults (no `enable` key). Optional for overlays that omit Android.                                                                                                   |
+| `config/android/hosts/<name>.json`     | Per-host Android opt-in (`enable`) and overrides. Required when base exists.                                                                                                              |
+| `config/schema/*.schema.json`          | JSON Schema for hosts, apps, fonts, Firefox, Android (validated by `scripts/validate-host-json.sh`)                                                                                       |
 | `config/user.json` / `config/git.json` | Shared profile (name, email, GPG) and git settings. Copy `config/user.json.example` to `config/user.json`.                                                                                |
 | `config/hosts.json`                    | Hostnames to build (`hosts`, `defaultHost`)                                                                                                                                               |
-| `config/hosts/<name>.json`             | Per-machine settings: `adminUsername`, `machineType` (`laptop` \| `macmini`), Homebrew, nix trusted/allowed users, optional `extraSessionPaths`, optional `knownNetworkServices` override |
+| `config/hosts/<name>.json`             | Per-machine settings: `adminUsername`, `machineType` (`laptop` \| `macmini`), Homebrew, nix trusted/allowed users, optional `extraSessionPaths`, `knownNetworkServices`, power / SoftwareUpdate overrides |
+| `docs/MACOS-27.md`                     | Major macOS / channel upgrade checklist                                                                                                                                                   |
+| `docs/SECURITY.md`                     | Trust model, post-install checklist (FileVault/Gatekeeper), secrets, Homebrew, Firefox, CI pinning                                                                                        |
 | `overlays/google-fonts/`               | Nix overlay packaging fonts from [google/fonts](https://github.com/google/fonts)                                                                                                          |
 | `scripts/new-host.sh`                  | Interactive scaffold for a new host (also `nix run '.#new-host'`)                                                                                                                         |
 | `darwin/`                              | nix-darwin modules (`configuration.nix`, `system.nix`)                                                                                                                                    |
-| `home/`                                | home-manager modules (`git.nix`, `vim.nix`, `vscode.nix`, `zsh.nix`, `firefox.nix`, …)                                                                                                    |
+| `home/`                                | home-manager modules (`git.nix`, `vim.nix`, `vscode.nix`, `zsh.nix`, `firefox.nix`, `android.nix`, …)                                                                                      |
 
 **Pinned inputs** (see `flake.lock`):
 
@@ -218,19 +228,19 @@ See: `home/zsh.nix` (the `assume()` function and auto-call example).
 
 ### 1Password secret loading
 
-This template uses [1Password CLI](https://developer.1password.com/docs/cli) for secret management. The `op` CLI is installed as a system package (`_1password-cli` in `config/apps/base.json`).
+This template integrates with [1Password CLI](https://developer.1password.com/docs/cli) when `op` is on PATH. Add `_1password-cli` to `config/apps` (system or user) if you want Nix to install it.
 
-To load a secret into an environment variable, uncomment the `load_secret` example alias in `home/zsh.nix`:
+Prefer short-lived injection:
 
 ```sh
-# load_secret = "export MY_TOKEN=$(op item get <op-item-id> --reveal --fields label=token)"
+op run --env-file=.env -- your-command
 ```
 
-Replace `<op-item-id>` with your 1Password item ID (find it with `op item list`).
+An optional shell alias pattern is commented in `home/zsh.nix` (`load_secret`). Prefer `op run` over exporting long-lived tokens into the shell environment.
 
-The `config/user.json.example` file also includes a `ghTokenOpItemId` field for storing a 1Password item ID that references a GitHub token — use this pattern to wire up any secret you need at switch time.
+SSH and git signing use the 1Password agent / `op-ssh-sign` (see Caveats), which needs the **1Password app**, not only the CLI.
 
-See: `home/zsh.nix` (the `load_secret` example alias), `config/user.json.example`.
+See: `home/zsh.nix`, [docs/SECURITY.md](docs/SECURITY.md).
 
 ### Firefox (backup browser)
 
@@ -269,9 +279,9 @@ All settings are consumer-overridable via `my.firefox.settings` (Nix) or per-hos
 
 **How extensions are installed:**
 
-By default (`my.firefox.useDeclarativeExtensions = false`), add-ons are installed via `home.file` symlinks (`force = true`) into the Firefox profile's `extensions/` directory. A post-switch activation re-links each XPI and prints `ls -la` of that directory so extensions are restored if Firefox removed them since the last switch. `extensions.autoDisableScopes = 0` is set when add-ons are configured so sideloaded extensions stay enabled.
+By default (`my.firefox.useDeclarativeExtensions = false`), add-ons are installed via `home.file` symlinks (`force = true`) into the Firefox profile's `extensions/` directory. A post-switch activation re-links each XPI and prints `ls -la` of that directory so extensions are restored if Firefox removed them since the last switch. `extensions.autoDisableScopes = 0` is set when add-ons are configured so sideloaded extensions stay enabled (see [docs/SECURITY.md](docs/SECURITY.md)).
 
-To use home-manager's declarative extension path instead, set `my.firefox.useDeclarativeExtensions = true` in your overlay config. This wires `programs.firefox.profiles.<name>.extensions.packages` directly.
+For a stricter trust model, set `my.firefox.useDeclarativeExtensions = true` so home-manager wires `programs.firefox.profiles.<name>.extensions.packages` instead of profile sideloads.
 
 **Overriding in an overlay:**
 
@@ -321,11 +331,31 @@ After switching, launch Firefox and open `about:addons` to confirm Dark Reader, 
 
 See: `home/firefox.nix`, `home/firefox/addons.nix`, `config/firefox/base.json`.
 
+### Android SDK
+
+Optional Nix-managed Android SDK via `home/android.nix` and `homeModules.android`.
+
+| Path | Role |
+| ---- | ---- |
+| `config/android/base.json` | Shared defaults (`jdkPackage`, symlink flags). **Must not** contain `enable`. |
+| `config/android/hosts/<name>.json` | Per-host `"enable": true \| false` and overrides. |
+| `config/schema/android.schema.json` | JSON Schema (validated when base exists). |
+
+This starter ships `enable: false` for `example-mac` so loaders and CI exercise the path without installing the SDK. To enable on a host:
+
+```json
+{ "enable": true }
+```
+
+Then `darwin-rebuild switch`. Overlay repos without `config/android/` get a no-op (`enable = false`). Thin overlays should pass `loadAndroidConfig` into `darwinConfigurationsBuilder` (see below).
+
+See: `home/android.nix`, `lib/default.nix` (`loadAndroidConfig`).
+
 ---
 
 ## Using as a flake overlay
 
-This template exposes `homeModules` and `darwinModules` as flake outputs so a private overlay repo can import and extend them. It also exports infrastructure (`lib`, `editorTooling`, `mkWritableCopyActivation`, `darwinConfigurationsBuilder`, `overlays.google-fonts`, `pkgsForValidation`, `validateApps`, `scripts.validateHostJson`) so overlay repos can build `darwinConfigurations` without copying any infrastructure files.
+This template exposes `homeModules` and `darwinModules` as flake outputs so a private overlay repo can import and extend them. It also exports infrastructure (`lib`, `editorTooling`, `mkWritableCopyActivation`, `darwinConfigurationsBuilder`, `overlayFlakeOutputs`, `overlays.google-fonts`, `pkgsForValidation`, `validateApps`, `scripts.validateHostJson`) so overlay repos can build `darwinConfigurations` without copying any infrastructure files.
 
 **Available exports:**
 
@@ -339,16 +369,18 @@ This template exposes `homeModules` and `darwinModules` as flake outputs so a pr
 | `homeModules.zsh`                | Just the zsh config module                                                                                                                                                |
 | `homeModules.editor`             | Editor tooling (Prettier + ESLint from flake-pinned config repos)                                                                                                         |
 | `homeModules.firefox`            | Just the Firefox backup browser module (opt-in via `my.firefox.enable`)                                                                                                   |
+| `homeModules.android`            | Just the Android SDK module (opt-in via `my.android.enable` / host JSON)                                                                                                  |
 | `darwinModules.default`          | Combined configuration.nix + system.nix                                                                                                                                   |
 | `darwinModules.configuration`    | Just the nix-darwin system config module                                                                                                                                  |
 | `darwinModules.system`           | Just the macOS defaults/networking module                                                                                                                                 |
-| `lib`                            | Config loaders (`loadHostsManifest`, `loadSharedConfig`, `loadUserConfig`, `loadAppConfig`, `loadHostConfig`, `loadRawHostConfig`, `loadFontConfig`, `loadFirefoxConfig`) |
+| `lib`                            | Config loaders (`loadHostsManifest`, `loadSharedConfig`, `loadUserConfig`, `loadAppConfig`, `loadHostConfig`, `loadRawHostConfig`, `loadFontConfig`, `loadFirefoxConfig`, `loadAndroidConfig`) |
 | `editorTooling`                  | Built editor tooling attrset, or `{}` when inputs are absent                                                                                                              |
-| `mkWritableCopyActivation`       | Helper for writable-copy activation scripts                                                                                                                               |
+| `mkWritableCopyActivation`       | Helper for writable-copy activation scripts (pass into `darwinConfigurationsBuilder`)                                                                                     |
 | `darwinConfigurationsBuilder`    | The `darwin/default.nix` function — call with your own config loaders and `extraHomeModules`                                                                              |
+| `overlayFlakeOutputs`            | Shared `apps` / `checks` / `formatter` / `devShell` helper used by this flake                                                                                              |
 | `overlays.google-fonts`          | The google-fonts nixpkgs overlay                                                                                                                                          |
 | `pkgsForValidation`              | nixpkgs with google-fonts overlay for app/font validation                                                                                                                 |
-| `validateApps`                   | App/font validation function for overlay checks                                                                                                                           |
+| `validateApps`                   | App/font/Firefox-slug/Android JDK validation for overlay checks                                                                                                           |
 | `scripts.validateHostJson`       | Shell derivation for host JSON schema validation in CI                                                                                                                    |
 
 Note: `homeModules.editor` is exported and wired to the flake-pinned `prettier-config` and `eslint-config` inputs. Overlay repos that don't provide those inputs should omit `homeModules.editor` from their imports.
@@ -378,15 +410,17 @@ An overlay repo builds its `darwinConfigurations` using only the starter's expor
       shared = flakeLib.loadSharedConfig flakeRoot;
     in {
       darwinConfigurations = dotnix-starter.darwinConfigurationsBuilder {
-        inherit (nixpkgs) lib pkgs;
+        inherit (nixpkgs) lib;
         inherit home-manager darwin system;
         inherit (shared) gitConfig;
         editorTooling = dotnix-starter.editorTooling;
+        mkWritableCopyActivation = dotnix-starter.mkWritableCopyActivation;
         hosts = manifest.hosts;
         loadHostConfig = flakeLib.loadHostConfig flakeRoot;
         loadAppConfig = flakeLib.loadAppConfig flakeRoot;
         loadFontConfig = flakeLib.loadFontConfig flakeRoot;
         loadFirefoxConfig = flakeLib.loadFirefoxConfig flakeRoot;
+        loadAndroidConfig = flakeLib.loadAndroidConfig flakeRoot;
         loadUserConfig = flakeLib.loadUserConfig flakeRoot;
         extraHomeModules = [ ./home/personal.nix ];
       };
@@ -400,11 +434,14 @@ An overlay repo builds its `darwinConfigurations` using only the starter's expor
             loadAppConfig = flakeLib.loadAppConfig flakeRoot;
             loadFontConfig = flakeLib.loadFontConfig flakeRoot;
             loadFirefoxConfig = flakeLib.loadFirefoxConfig flakeRoot;
+            loadAndroidConfig = flakeLib.loadAndroidConfig flakeRoot;
           }) == { };
         lib.genAttrs manifest.hosts (host: self.darwinConfigurations.${host}.system);
     };
 }
 ```
+
+Prefer `dotnix-starter.overlayFlakeOutputs` when you want the same `apps` / `checks` / `formatter` / `devShell` wiring as this template (see `lib/overlay-flake-outputs.nix`).
 
 **Manual overlay example (module-level):**
 
@@ -469,7 +506,18 @@ Controls what happens to brews/casks **not** listed in your merged config on eac
 | `uninstall` | Remove unlisted packages                                      |
 | `zap`       | Remove unlisted packages and zap cask files (most aggressive) |
 
-Use `check` or `none` on a shared machine if others install brews outside this flake.
+Use `check` or `none` on a shared machine if others install brews outside this flake. Prefer `check` over `zap` unless you intentionally want destructive cleanup (see [docs/SECURITY.md](docs/SECURITY.md)).
+
+### Host JSON overrides
+
+Optional keys in `config/hosts/<name>.json`:
+
+| Key | Default | Notes |
+| --- | ------- | ----- |
+| `restartAfterPowerFailure` | From `machineType` preset | Override laptop/macmini preset |
+| `automaticallyInstallMacOSUpdates` | `true` | Set `false` before major macOS betas ([docs/MACOS-27.md](docs/MACOS-27.md)) |
+| `knownNetworkServices` | From preset | Override interface display names |
+| `extraSessionPaths` | `[]` | Extra PATH entries for the user session |
 
 ### `machineType` (host presets)
 
@@ -504,7 +552,11 @@ If activation stops because an existing file would be "clobbered", `home-manager
 
 ### Secrets
 
-Do not commit API tokens, private keys, or `.env` files (see `.gitignore`). Signing keys and public git metadata in `config/user.json` / `config/git.json` are fine. For encrypted repo secrets, consider [sops-nix](https://github.com/Mic92/sops-nix) or [agenix](https://github.com/ryantm/agenix). Shell tokens are loaded via 1Password (see [1Password secret loading](#1password-secret-loading)).
+Do not commit API tokens, private keys, or `.env` files (see `.gitignore`). Signing keys and public git metadata in `config/user.json` / `config/git.json` are fine. For encrypted repo secrets, consider [sops-nix](https://github.com/Mic92/sops-nix) or [agenix](https://github.com/ryantm/agenix). Prefer `op run` for shell secrets (see [1Password secret loading](#1password-secret-loading) and [docs/SECURITY.md](docs/SECURITY.md)).
+
+### Periodic updates and macOS upgrades
+
+See [docs/MACOS-27.md](docs/MACOS-27.md) for the weekly lockfile cadence, Dependabot Actions pins, and the checklist for Apple major releases / Nix channel bumps. Channel bumps are **manual** `flake.nix` ref edits — `nix flake update` alone stays on `*-26.05`.
 
 ### Pre-commit (optional)
 
@@ -515,7 +567,7 @@ pre-commit install
 pre-commit run --all-files
 ```
 
-Hooks (see `.pre-commit-config.yaml`): `nix fmt --check` on `*.nix`, `shellcheck` on `scripts/*.sh` and `build-darwin.sh`. Not required for CI.
+Hooks (see `.pre-commit-config.yaml`): **`nix fmt`** (writes, then `--check`) on `*.nix`, `shellcheck` on `scripts/*.sh` and `build-darwin.sh`. Agents must also run `nix fmt` before committing Nix (see [AGENTS.md](AGENTS.md) and `.cursor/rules/nixfmt.mdc`). Not required for CI beyond the flake `fmt` job.
 
 ### Releasing
 
@@ -546,14 +598,14 @@ To cache Nix store paths on GitHub Actions, add a [Cachix](https://www.cachix.or
 
 ## CI
 
-GitHub Actions on `macos-14` (Apple Silicon):
+GitHub Actions on `macos-14` (Apple Silicon; update the runner image when validating newer macOS — see [docs/MACOS-27.md](docs/MACOS-27.md)):
 
-- **Evaluate flake** — verifies every host in `config/hosts.json` has matching JSON under `config/hosts/`, `config/apps/hosts/`, `config/fonts/hosts/`, and `config/firefox/hosts/`; validates each host JSON against `config/schema/host.schema.json` and Firefox JSON against `config/schema/firefox.schema.json`; then `nix flake check --no-build` (includes app/font package name validation).
+- **Evaluate flake** — verifies every host in `config/hosts.json` has matching JSON under `config/hosts/`, `config/apps/hosts/`, `config/fonts/hosts/`, and (when present) Firefox/Android hosts; validates against `config/schema/*.schema.json`; then `nix flake check --no-build` (includes app/font package name and Firefox slug validation).
 - **Nix formatting** — dedicated job: `nix fmt -- --check` on all tracked `*.nix` files.
 - **Per-host build** (`.github/workflows/flake.yml`) — matrix derived from `config/hosts.json`: builds `.#checks.aarch64-darwin.<host>`.
 - **shellcheck** — `scripts/*.sh` and `build-darwin.sh` on Ubuntu.
-- **Update flake inputs** (`.github/workflows/update-flake.yml`) — weekly (and manual) `nix flake update` with an automated PR when the lockfile changes.
-- **Dependabot** (`.github/dependabot.yml`) — weekly GitHub Actions dependency updates.
+- **Update flake inputs** (`.github/workflows/update-flake.yml`) — weekly (and manual) `nix flake update` with eval check and an automated PR; full host builds run on the PR via `flake.yml`.
+- **Dependabot** (`.github/dependabot.yml`) — weekly GitHub Actions dependency updates (workflows pin Actions by commit SHA).
 
 Linux runners cannot build this flake; CI must stay on macOS.
 
@@ -564,9 +616,10 @@ Linux runners cannot build this flake; CI must stay on macOS.
 - **Apple Silicon only.** The flake hardcodes `system = "aarch64-darwin"`. Intel Macs (`x86_64-darwin`) are not supported.
 - Only brews/casks listed in the merged app and font configs are installed when `homebrewCleanup` is `uninstall` or `zap`; extras are removed on switch.
 - **mas** = Mac App Store apps (IDs in `config/apps/base.json` and/or `config/apps/hosts/<host>.json`). Find existing app IDs with [mas-cli](https://github.com/mas-cli/mas).
-- [Trusted users](https://nixos.org/manual/nix/stable/command-ref/conf-file.html#conf-trusted-users) are the current user plus any listed in the host JSON. Default: `[<username>]`.
-- [Allowed users](https://nixos.org/manual/nix/stable/command-ref/conf-file.html#conf-allowed-users) are the current user plus config. Default for new hosts: `[adminUsername]`.
+- [Trusted users](https://nixos.org/manual/nix/stable/command-ref/conf-file.html#conf-trusted-users) are the current user plus any listed in the host JSON. Default: `[<username>]`. Never use `"*"`.
+- [Allowed users](https://nixos.org/manual/nix/stable/command-ref/conf-file.html#conf-allowed-users) are the current user plus config. Default for new hosts: `[adminUsername]`. Never use `"*"`.
+- Guest login is disabled; Remote Login (`services.openssh`) is off; screensaver requires a password immediately. FileVault and Gatekeeper stay **out of band** — see [docs/SECURITY.md](docs/SECURITY.md).
 - `EDITOR=nvim` and `VISUAL=code` in zsh are intentional (terminal vs GUI default).
 - SSH `HashKnownHosts` is enabled in home-manager.
-- Git is configured to [sign commits](https://git-scm.com/book/en/v2/Git-Tools-Signing-Your-Work) with [GPG](https://docs.github.com/en/authentication/managing-commit-signature-verification/generating-a-new-gpg-key). Remove or adjust if you don't need signing.
+- Git signs commits with **SSH** via 1Password (`gpg.format = "ssh"` and `op-ssh-sign`), not classic GPG. Set `defaultSigningKey` in `config/user.json`. Adjust `home/git.nix` if you do not want signing.
 - **Cursor extension pins:** Cursor's VS Code engine lags upstream. **Nix IDE** and **Python Environments** are installed for Cursor via `cursor --install-extension` on home-manager activation (HM symlinks are not enough). They will not appear in marketplace search; check **Installed** or `cursor --list-extensions | grep -E 'nix-ide|python-envs'`. If missing after switch, run manually: `cursor --install-extension jnoortheen.nix-ide --force && cursor --install-extension ms-python.vscode-python-envs --force`, then reload the window.

@@ -9,6 +9,9 @@ on:
     paths-ignore:
       - 'CHANGELOG.md'
 
+permissions:
+  contents: read
+
 concurrency:
   group: flake-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -20,7 +23,8 @@ jobs:
       hosts: ${{ steps.hosts.outputs.hosts }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        # actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Derive host matrix from config/hosts.json
         id: hosts
@@ -33,10 +37,12 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        # actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v22
+        # DeterminateSystems/nix-installer-action@v22
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25
 
       - name: Verify host JSON scaffolding
         run: |
@@ -51,10 +57,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        # actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v22
+        # DeterminateSystems/nix-installer-action@v22
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25
 
       - name: Check Nix formatting
         run: git ls-files -z '*.nix' | xargs -0 nix fmt -- --check
@@ -63,7 +71,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        # actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
@@ -83,10 +92,12 @@ jobs:
         host: ${{ fromJSON(needs.setup.outputs.hosts) }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        # actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v22
+        # DeterminateSystems/nix-installer-action@v22
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25
 
       - name: Build host check
         run: nix build --option warn-dirty false '.#checks.aarch64-darwin.${{ matrix.host }}'

@@ -26,16 +26,19 @@
     "homebrewPrefix": { "type": "string", "minLength": 1 },
     "homebrewCleanup": {
       "type": "string",
-      "enum": ["none", "check", "uninstall", "zap"]
+      "enum": ["none", "check", "uninstall", "zap"],
+      "description": "Prefer check on shared machines; zap is destructive (removes undeclared formulae/casks)."
     },
     "trustedUsers": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": { "type": "string" },
+      "description": "Extra Nix trusted-users beyond adminUsername. Never use \"*\" — trusted users can add substituters without a password prompt."
     },
     "allowedUsers": {
       "type": "array",
       "items": { "type": "string" },
-      "minItems": 1
+      "minItems": 1,
+      "description": "Nix allowed-users. Prefer explicit usernames; never use \"*\"."
     },
     "extraSessionPaths": {
       "type": "array",
@@ -45,6 +48,14 @@
       "type": "array",
       "items": { "type": "string", "minLength": 1 },
       "minItems": 1
+    },
+    "restartAfterPowerFailure": {
+      "type": "boolean",
+      "description": "Override the machineType preset (laptop=false, macmini=true)."
+    },
+    "automaticallyInstallMacOSUpdates": {
+      "type": "boolean",
+      "description": "Defaults to true. Set false before major macOS betas until nix-darwin supports the new OS."
     }
   }
 }

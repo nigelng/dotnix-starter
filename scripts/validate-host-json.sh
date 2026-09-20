@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# Validate config/hosts/<host>.json against config/schema/host.schema.json.
+# Validate host/apps/fonts/firefox/android JSON against config/schema/*.schema.json.
 # Run from the repo root, or pass the repo root as $1.
 set -euo pipefail
 
 ROOT="${1:-$PWD}"
 cd "$ROOT"
 
-schema="config/schema/host.schema.json"
+host_schema="config/schema/host.schema.json"
+apps_schema="config/schema/apps.schema.json"
+fonts_schema="config/schema/fonts.schema.json"
 manifest="config/hosts.json"
 
 if ! command -v jq >/dev/null 2>&1; then
@@ -55,6 +57,32 @@ if errors:
         print(f"{data_path}: {path}: {err.message}", file=sys.stderr)
     sys.exit(1)
 PY
+}
+
+validate_apps() {
+  for path in \
+    "config/apps/base.json" \
+    "config/apps/hosts/${1}.json"; do
+    if [[ ! -f "$path" ]]; then
+      echo "Missing required apps config: $path" >&2
+      exit 1
+    fi
+    jq -e . "$path" >/dev/null
+    validate_with_python "$apps_schema" "$path"
+  done
+}
+
+validate_fonts() {
+  for path in \
+    "config/fonts/base.json" \
+    "config/fonts/hosts/${1}.json"; do
+    if [[ ! -f "$path" ]]; then
+      echo "Missing required fonts config: $path" >&2
+      exit 1
+    fi
+    jq -e . "$path" >/dev/null
+    validate_with_python "$fonts_schema" "$path"
+  done
 }
 
 validate_firefox() {
@@ -111,7 +139,9 @@ for host in "${hosts[@]}"; do
   done
   host_json="config/hosts/${host}.json"
   jq -e . "$host_json" >/dev/null
-  validate_with_python "$schema" "$host_json"
+  validate_with_python "$host_schema" "$host_json"
+  validate_apps "$host"
+  validate_fonts "$host"
   validate_firefox "$host"
   validate_android "$host"
 done

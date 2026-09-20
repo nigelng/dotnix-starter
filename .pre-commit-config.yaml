@@ -2,9 +2,10 @@ repos:
   - repo: local
     hooks:
       - id: nix-fmt
-        name: nix fmt check
-        entry: nix fmt -- --check
+        name: nix fmt
+        entry: bash -c 'git ls-files -z "*.nix" | xargs -0 nix fmt && git ls-files -z "*.nix" | xargs -0 nix fmt -- --check'
         language: system
+        pass_filenames: false
         files: \.nix$
       - id: shellcheck
         name: shellcheck

@@ -3,6 +3,7 @@
 #   │   ├── apps/base.json, apps/hosts/<name>.json
 #   │   ├── fonts/base.json, fonts/hosts/<name>.json
 #   │   ├── firefox/base.json, firefox/hosts/<name>.json
+#   │   ├── android/base.json, android/hosts/<name>.json
 #   │   ├── user.json, git.json              # shared profile / git
 #   │   ├── hosts.json                       # host list + default
 #   │   └── hosts/<name>.json                # per-machine settings + adminUsername
@@ -101,7 +102,6 @@
 
       darwinConfigurations = import ./darwin {
         inherit (nixpkgs) lib;
-        inherit pkgs;
         inherit
           flakeRoot
           home-manager
@@ -109,6 +109,7 @@
           system
           gitConfig
           editorTooling
+          mkWritableCopyActivation
           ;
         hosts = manifest.hosts;
         loadHostConfig = flakeLib.loadHostConfig flakeRoot;

@@ -92,7 +92,16 @@ let
         extraSessionPaths = listAttr raw "extraSessionPaths";
         knownNetworkServices =
           if raw ? knownNetworkServices then raw.knownNetworkServices else preset.knownNetworkServices;
-        restartAfterPowerFailure = preset.restartAfterPowerFailure;
+        # Host JSON can override the machineType preset.
+        restartAfterPowerFailure =
+          if raw ? restartAfterPowerFailure then
+            raw.restartAfterPowerFailure
+          else
+            preset.restartAfterPowerFailure;
+        # Defaults to true for compatibility; set false before major macOS betas
+        # until nix-darwin supports the new OS (see docs/MACOS-27.md).
+        automaticallyInstallMacOSUpdates =
+          if raw ? automaticallyInstallMacOSUpdates then raw.automaticallyInstallMacOSUpdates else true;
       };
 
   loadFontConfig =

@@ -20,20 +20,23 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        # actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v22
+        # DeterminateSystems/nix-installer-action@v22
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25
 
       - name: Update lock file
         run: nix flake update
 
-      - name: Verify flake
-        run: nix flake check
+      - name: Evaluate flake (no build)
+        run: nix flake check --no-build --option warn-dirty false
 
       - name: Open pull request
         id: cpr
-        uses: peter-evans/create-pull-request@v8
+        # peter-evans/create-pull-request@v8
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1
         with:
           # PAT bypasses the "Actions may not create PRs" repo setting when set.
           token: ${{ secrets.WORKFLOW_PAT || github.token }}
@@ -42,7 +45,7 @@ jobs:
           body: |
             Automated `nix flake update` from the weekly workflow.
 
-            Review `flake.lock` diff and merge when CI passes.
+            Review `flake.lock` diff and merge when CI passes (full host builds run on the PR via flake.yml).
           branch: automation/flake-update
           delete-branch: true
           labels: dependencies

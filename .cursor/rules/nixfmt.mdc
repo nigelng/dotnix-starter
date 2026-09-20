@@ -1,0 +1,34 @@
+---
+description: Always format Nix with nixfmt before committing
+globs:
+  - "**/*.nix"
+alwaysApply: true
+---
+
+# nixfmt required
+
+This repository's CI runs `nix fmt -- --check` on every tracked `*.nix` file (`Flake check / fmt`). Unformatted Nix fails the PR.
+
+## Required before every commit that touches Nix
+
+1. After editing any `*.nix` files, format them with the flake formatter:
+
+   ```sh
+   nix fmt
+   # or only changed files:
+   git ls-files -z '*.nix' | xargs -0 nix fmt
+   ```
+
+2. Confirm clean:
+
+   ```sh
+   git ls-files -z '*.nix' | xargs -0 nix fmt -- --check
+   ```
+
+3. Do **not** commit or push Nix changes until the check passes.
+
+## Notes
+
+- Prefer `nix fmt` from the repo flake (matches CI), not a random global `nixfmt` version, when possible.
+- Optional local hook: `pre-commit install` (see `.pre-commit-config.yaml`) formats/checks on commit.
+- Applies to cloud and local Cursor agents alike — treat this as a hard gate, not a nice-to-have.

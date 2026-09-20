@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nigelng/dotnix-starter/config/schema/fonts.schema.json",
+  "title": "Fonts config",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "pkgs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "nixpkgs font package attributes (e.g. font-awesome)."
+    },
+    "nerd": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "pkgs.nerd-fonts attribute names (e.g. meslo-lg, jetbrains-mono)."
+    },
+    "google": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Google Fonts family names packaged via overlays/google-fonts."
+    },
+    "casks": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Optional Homebrew font casks (merged into homebrew casks)."
+    }
+  }
+}

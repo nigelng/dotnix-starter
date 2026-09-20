@@ -72,7 +72,7 @@ let
     redhat.telemetry.enabled = false;
 
     scm.inputFontSize = 14;
-    security.workspace.trust.untrustedFiles = "open";
+    security.workspace.trust.untrustedFiles = "prompt";
 
     terminal.integrated.fontSize = 15;
     terminal.integrated.lineHeight = 1.25;

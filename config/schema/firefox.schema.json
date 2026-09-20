@@ -3,7 +3,7 @@
   "$id": "https://github.com/nigelng/dotnix-starter/config/schema/firefox.schema.json",
   "title": "Firefox backup browser config",
   "type": "object",
-  "additionalProperties": true,
+  "additionalProperties": false,
   "properties": {
     "package": {
       "type": "string",

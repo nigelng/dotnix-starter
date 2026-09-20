@@ -65,8 +65,7 @@ in
         SortColumn = "CPUUsage";
       };
 
-      SoftwareUpdate.AutomaticallyInstallMacOSUpdates =
-        systemConfig.automaticallyInstallMacOSUpdates;
+      SoftwareUpdate.AutomaticallyInstallMacOSUpdates = systemConfig.automaticallyInstallMacOSUpdates;
 
       finder = {
         # show full POSIX path as Finder window title

@@ -101,10 +101,7 @@ let
         # Defaults to true for compatibility; set false before major macOS betas
         # until nix-darwin supports the new OS (see docs/MACOS-27.md).
         automaticallyInstallMacOSUpdates =
-          if raw ? automaticallyInstallMacOSUpdates then
-            raw.automaticallyInstallMacOSUpdates
-          else
-            true;
+          if raw ? automaticallyInstallMacOSUpdates then raw.automaticallyInstallMacOSUpdates else true;
       };
 
   loadFontConfig =

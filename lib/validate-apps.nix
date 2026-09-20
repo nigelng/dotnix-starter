@@ -17,10 +17,7 @@ let
   missingGoogleFonts = names: lib.filter (n: (pkgs.${"google-fonts-" + n} or null) == null) names;
 
   firefoxAddons =
-    if loadFirefoxConfig == null then
-      null
-    else
-      import ../home/firefox/addons.nix { inherit pkgs lib; };
+    if loadFirefoxConfig == null then null else import ../home/firefox/addons.nix { inherit pkgs lib; };
 
   validateFirefoxPackage =
     hostName:

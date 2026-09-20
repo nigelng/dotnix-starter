@@ -11,7 +11,7 @@ This template is designed to work standalone **and** as a flake overlay — a pr
 - **zsh** as the login shell
 - **Fonts**: `config/fonts/base.json` defines `pkgs` (nixpkgs-only), `google` (via `overlays/google-fonts`), and `nerd` (starter ships `meslo-lg`); per-host extras (including optional Homebrew font `casks`) in `config/fonts/hosts/<hostname>.json`
 - **Ghostty config** — Nix defaults from `home/themes/default.nix` into `~/.config/ghostty/config.d/nix.conf`; personal overrides in `~/.config/ghostty/local.conf`. Install the Ghostty app yourself (e.g. add a Homebrew cask in apps JSON)
-- **[Firefox](https://www.mozilla.org/firefox/)** — backup browser via `firefox-bin` with Dark Reader, 1Password, and AdGuard AdBlocker; privacy-hardened defaults; JSON-driven config in `config/firefox/` (see [Firefox (backup browser)](#firefox-backup-browser))
+- **[Firefox](https://www.mozilla.org/firefox/)** — backup browser via Homebrew cask with Dark Reader, 1Password, AdGuard AdBlocker, and Privacy Badger; privacy-hardened HM profile defaults; JSON-driven config in `config/firefox/` (see [Firefox (backup browser)](#firefox-backup-browser))
 - **btop** with Catppuccin Mocha theme
 
 **User-scope extras** (home-manager):
@@ -60,7 +60,7 @@ Uppercase `G*` shortcuts come from zimfw's `git` module (`zmodule git` in `home/
 | `config/apps/hosts/<name>.json`        | Per-host extras only (additive merge; lists deduplicated). Required for each host in `config/hosts.json`.                                                                                 |
 | `config/fonts/base.json`               | Fonts on every host: `pkgs`, `google`, `nerd` (optional `casks` per host in `config/fonts/hosts/<name>.json`)                                                                             |
 | `config/fonts/hosts/<name>.json`       | Per-host font extras only (additive merge). Required for each host in `config/hosts.json`.                                                                                                |
-| `config/firefox/base.json`             | Firefox backup browser defaults: `package`, `profileName`, `settings` (about:config), `extensions.nix` (AMO slugs)                                                                        |
+| `config/firefox/base.json`             | Firefox backup browser defaults: `profileName`, `settings` (about:config), `extensions.nix` (AMO slugs)                                                                                   |
 | `config/firefox/hosts/<name>.json`     | Per-host Firefox overrides (additive merge for extensions, per-key override for settings). Required for each host in `config/hosts.json`.                                                 |
 | `config/android/base.json`             | Shared Android SDK defaults (no `enable` key). Optional for overlays that omit Android.                                                                                                   |
 | `config/android/hosts/<name>.json`     | Per-host Android opt-in (`enable`) and overrides. Required when base exists.                                                                                                              |
@@ -244,7 +244,7 @@ See: `home/zsh.nix`, [docs/SECURITY.md](docs/SECURITY.md).
 
 ### Firefox (backup browser)
 
-[Mozilla Firefox](https://www.mozilla.org/firefox/) is installed as a backup browser via `firefox-bin` and home-manager `programs.firefox`. It ships with three AMO add-ons — **Dark Reader**, **1Password**, and **AdGuard AdBlocker** — plus a privacy-hardened profile (telemetry opt-out, DNS-over-HTTPS via Cloudflare, fingerprinting resistance, strict content blocking). The configuration is JSON-driven and extendable by both standalone users and overlay consumers.
+[Mozilla Firefox](https://www.mozilla.org/firefox/) is installed as a backup browser via the Homebrew `firefox` cask (`config/apps/base.json`). home-manager `programs.firefox` manages the profile, settings, and extensions only (`my.firefox.package = null` by default — same pattern as VS Code). It ships with four AMO add-ons — **Dark Reader**, **1Password**, **AdGuard AdBlocker**, and **Privacy Badger** — plus a privacy-hardened profile (telemetry opt-out, DNS-over-HTTPS via Cloudflare, fingerprinting resistance, strict content blocking). The configuration is JSON-driven and extendable by both standalone users and overlay consumers.
 
 **Add-ons installed by default:**
 
@@ -253,6 +253,7 @@ See: `home/zsh.nix`, [docs/SECURITY.md](docs/SECURITY.md).
 | Dark Reader       | `darkreader`                     | Dark mode for all sites |
 | 1Password         | `onepassword-x-password-manager` | Password manager        |
 | AdGuard AdBlocker | `adguard-adblocker`              | Ad/tracker blocking     |
+| Privacy Badger    | `privacy-badger17`               | Tracker blocking        |
 
 **Privacy/telemetry settings (in `config/firefox/base.json`):**
 
@@ -273,7 +274,7 @@ All settings are consumer-overridable via `my.firefox.settings` (Nix) or per-hos
 
 | Path                                | Role                                                                                                      |
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `config/firefox/base.json`          | Default Firefox package, profile name, `settings` (about:config prefs), and `extensions.nix` (AMO slugs)  |
+| `config/firefox/base.json`          | Default profile name, `settings` (about:config prefs), and `extensions.nix` (AMO slugs)                   |
 | `config/firefox/hosts/<name>.json`  | Per-host overrides (additive merge for extension lists, per-key override for settings). Use `{}` if none. |
 | `config/schema/firefox.schema.json` | JSON Schema for the Firefox config (validated by `scripts/validate-host-json.sh`)                         |
 
@@ -285,7 +286,10 @@ For a stricter trust model, set `my.firefox.useDeclarativeExtensions = true` so 
 
 **Overriding in an overlay:**
 
-The thin overlay path (`darwinConfigurationsBuilder`) includes the Firefox module but disables it by default when `config/firefox/base.json` doesn't exist. To enable Firefox in an overlay, either create `config/firefox/base.json` (which enables it automatically) or set `my.firefox.enable = true` in your `extraHomeModules`:
+The thin overlay path (`darwinConfigurationsBuilder`) includes the Firefox module but disables it by default when `config/firefox/base.json` doesn't exist. To enable Firefox in an overlay:
+
+1. Add `"firefox"` to your apps `casks` (e.g. `config/apps/base.json`), same as VS Code / Ghostty.
+2. Either create `config/firefox/base.json` (which enables HM Firefox automatically) or set `my.firefox.enable = true` in your `extraHomeModules`.
 
 ```nix
 home-manager.users.myuser = {
@@ -299,8 +303,12 @@ home-manager.users.myuser = {
   my.firefox.nixExtensions = [ someAddonPkg ];
   # Use declarative extensions instead of home.file symlinks
   my.firefox.useDeclarativeExtensions = true;
+  # Optional: install Firefox via nixpkgs instead of the Homebrew cask
+  # my.firefox.package = pkgs.firefox-bin;
 };
 ```
+
+If you previously used nixpkgs `firefox-bin`, remove that app (and any leftover Nix-managed `Firefox.app`) after switching to the cask so you do not keep two installs.
 
 **Adding non-AMO extensions:**
 
@@ -327,7 +335,7 @@ Home-manager will back up any existing files in `~/Library/Application Support/F
 
 **Verifying add-ons:**
 
-After switching, launch Firefox and open `about:addons` to confirm Dark Reader, 1Password, and AdGuard AdBlocker are installed and enabled. Open `about:config` to verify the settings from `config/firefox/base.json`.
+After switching, launch Firefox and open `about:addons` to confirm Dark Reader, 1Password, AdGuard AdBlocker, and Privacy Badger are installed and enabled. Open `about:config` to verify the settings from `config/firefox/base.json`.
 
 See: `home/firefox.nix`, `home/firefox/addons.nix`, `config/firefox/base.json`.
 

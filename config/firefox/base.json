@@ -1,5 +1,4 @@
 {
-  "package": "firefox-bin",
   "profileName": "default",
   "settings": {
     "app.normandy.api_url": "",
@@ -38,7 +37,8 @@
     "nix": [
       "darkreader",
       "onepassword-x-password-manager",
-      "adguard-adblocker"
+      "adguard-adblocker",
+      "privacy-badger17"
     ],
     "manual": []
   }

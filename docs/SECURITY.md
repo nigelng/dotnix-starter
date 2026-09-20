@@ -51,6 +51,7 @@ nix-darwin does **not** manage disk encryption or Gatekeeper assessment policy. 
 
 ## Firefox
 
+- The Firefox **app** comes from the Homebrew `firefox` cask (not nixpkgs). home-manager manages profile, settings, and extensions only (`my.firefox.package = null` by default).
 - Add-ons are content-addressed (`fetchFirefoxAddon` + sha256 in `home/firefox/addons.nix`). Auto-update prefs are off so CVE fixes need intentional hash bumps.
 - Default install path sideloads XPIs and sets `extensions.autoDisableScopes = 0` so they stay enabled. Prefer `my.firefox.useDeclarativeExtensions = true` for a stricter trust model.
 - `extensions.manual` accepts arbitrary URL + hash — treat host JSON as trusted input.

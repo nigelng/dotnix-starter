@@ -42,7 +42,7 @@ jobs:
 
       - name: Install Nix
         # DeterminateSystems/nix-installer-action@v22
-        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25
+        uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa
 
       - name: Verify host JSON scaffolding
         run: |
@@ -62,7 +62,7 @@ jobs:
 
       - name: Install Nix
         # DeterminateSystems/nix-installer-action@v22
-        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25
+        uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa
 
       - name: Check Nix formatting
         run: git ls-files -z '*.nix' | xargs -0 nix fmt -- --check
@@ -97,7 +97,7 @@ jobs:
 
       - name: Install Nix
         # DeterminateSystems/nix-installer-action@v22
-        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25
+        uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa
 
       - name: Build host check
         run: nix build --option warn-dirty false '.#checks.aarch64-darwin.${{ matrix.host }}'

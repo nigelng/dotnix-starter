@@ -69,7 +69,7 @@ Uppercase `G*` shortcuts come from zimfw's `git` module (`zmodule git` in `home/
 | `config/hosts.json`                    | Hostnames to build (`hosts`, `defaultHost`)                                                                                                                                               |
 | `config/hosts/<name>.json`             | Per-machine settings: `adminUsername`, `machineType` (`laptop` \| `macmini`), Homebrew, nix trusted/allowed users, optional `extraSessionPaths`, `knownNetworkServices`, power / SoftwareUpdate overrides |
 | `docs/MACOS-27.md`                     | Major macOS / channel upgrade checklist                                                                                                                                                   |
-| `docs/SECURITY.md`                     | Trust model, secrets, Homebrew, Firefox, CI pinning                                                                                                                                       |
+| `docs/SECURITY.md`                     | Trust model, post-install checklist (FileVault/Gatekeeper), secrets, Homebrew, Firefox, CI pinning                                                                                        |
 | `overlays/google-fonts/`               | Nix overlay packaging fonts from [google/fonts](https://github.com/google/fonts)                                                                                                          |
 | `scripts/new-host.sh`                  | Interactive scaffold for a new host (also `nix run '.#new-host'`)                                                                                                                         |
 | `darwin/`                              | nix-darwin modules (`configuration.nix`, `system.nix`)                                                                                                                                    |
@@ -618,6 +618,7 @@ Linux runners cannot build this flake; CI must stay on macOS.
 - **mas** = Mac App Store apps (IDs in `config/apps/base.json` and/or `config/apps/hosts/<host>.json`). Find existing app IDs with [mas-cli](https://github.com/mas-cli/mas).
 - [Trusted users](https://nixos.org/manual/nix/stable/command-ref/conf-file.html#conf-trusted-users) are the current user plus any listed in the host JSON. Default: `[<username>]`. Never use `"*"`.
 - [Allowed users](https://nixos.org/manual/nix/stable/command-ref/conf-file.html#conf-allowed-users) are the current user plus config. Default for new hosts: `[adminUsername]`. Never use `"*"`.
+- Guest login is disabled; Remote Login (`services.openssh`) is off; screensaver requires a password immediately. FileVault and Gatekeeper stay **out of band** — see [docs/SECURITY.md](docs/SECURITY.md).
 - `EDITOR=nvim` and `VISUAL=code` in zsh are intentional (terminal vs GUI default).
 - SSH `HashKnownHosts` is enabled in home-manager.
 - Git signs commits with **SSH** via 1Password (`gpg.format = "ssh"` and `op-ssh-sign`), not classic GPG. Set `defaultSigningKey` in `config/user.json`. Adjust `home/git.nix` if you do not want signing.

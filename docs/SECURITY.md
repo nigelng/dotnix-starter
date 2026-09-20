@@ -2,6 +2,32 @@
 
 This template is a starter for personal Apple Silicon Macs. Defaults favor a working developer setup; adjust for stricter threat models.
 
+## Post-install checklist (out of band)
+
+nix-darwin does **not** manage disk encryption or Gatekeeper assessment policy. Do these once per Mac (or via MDM):
+
+1. **FileVault** — System Settings → Privacy & Security → FileVault → Turn On. Store the recovery key in 1Password (or your org’s escrow). Confirm with `fdesetup status`.
+2. **Gatekeeper** — leave at the macOS default (App Store and identified developers). Do not run `spctl --master-disable`. Avoid managing Gatekeeper from this flake.
+3. **Startup Security** (Apple Silicon) — Recovery → Startup Security Utility: Full Security when possible.
+4. **Sharing** — System Settings → General → Sharing: leave Remote Login / Screen Sharing / File Sharing **off** unless you need them. This flake sets `services.openssh.enable = false` so Remote Login stays off on switch.
+5. **Login** — disable automatic login in System Settings if it was ever enabled (nix-darwin cannot reliably clear an existing auto-login). Guest account is disabled declaratively (`loginwindow.GuestEnabled = false`).
+6. **Lock screen** — confirm password is required immediately after sleep/screensaver (flake sets screensaver prefs; verify in System Settings if behavior drifts).
+7. **SIP / Lockdown Mode** — leave SIP enabled; enable Lockdown Mode only if your threat model needs it (per Apple Account, not via this flake).
+8. **Firmware password** — not applicable on Apple Silicon; on Intel, set only via Recovery if you still use Intel Macs.
+
+## Declarative defaults (this flake)
+
+| Control | Setting | Notes |
+| ------- | ------- | ----- |
+| Application firewall | on + stealth | `allowSigned` / `allowSignedApp` set explicitly |
+| Guest login | off | `system.defaults.loginwindow.GuestEnabled = false` |
+| Screensaver password | on, delay 0 | Verify after major macOS upgrades |
+| Remote Login (sshd) | off | `services.openssh.enable = false`; set `true` in an overlay if needed |
+| Touch ID / Watch ID sudo | on | Disable in `darwin/system.nix` for a stricter local threat model |
+| Auto macOS updates | host JSON | Prefer `automaticallyInstallMacOSUpdates: false` before major OS betas ([MACOS-27.md](MACOS-27.md)) |
+
+**Not managed here (by design):** FileVault, Gatekeeper/`spctl`, SIP, Lockdown Mode, firmware password, custom `pf` rules, full Software Update MDM/DDM policy.
+
 ## Nix trust
 
 - The macOS admin (`adminUsername`) is always a **trusted-user** (plus any names in host JSON `trustedUsers`).
@@ -28,7 +54,7 @@ This template is a starter for personal Apple Silicon Macs. Defaults favor a wor
 - Add-ons are content-addressed (`fetchFirefoxAddon` + sha256 in `home/firefox/addons.nix`). Auto-update prefs are off so CVE fixes need intentional hash bumps.
 - Default install path sideloads XPIs and sets `extensions.autoDisableScopes = 0` so they stay enabled. Prefer `my.firefox.useDeclarativeExtensions = true` for a stricter trust model.
 - `extensions.manual` accepts arbitrary URL + hash — treat host JSON as trusted input.
-- DoH mode `2` falls back to system DNS; set `network.trr.mode` to `3` for DoH-only.
+- DoH mode `2` falls back to system DNS; set `network.trr.mode` to `3` in `config/firefox/` for DoH-only.
 
 ## Editors
 
@@ -40,11 +66,5 @@ This template is a starter for personal Apple Silicon Macs. Defaults favor a wor
 - Workflows pin Actions by **commit SHA** (version in a comment). Dependabot still opens weekly bumps for `github-actions`.
 - `flake.yml` uses least-privilege `permissions: contents: read`.
 - Release / update-flake workflows need write permissions (or `WORKFLOW_PAT`); scope the PAT tightly and review ruleset exemptions.
-
-## System defaults
-
-- Application firewall + stealth mode are enabled.
-- Touch ID / Watch ID for sudo are enabled for convenience — disable in `darwin/system.nix` if that is too trustful for your environment.
-- FileVault, Gatekeeper, and firmware password are not managed here; enable them out of band if required.
 
 See also [MACOS-27.md](MACOS-27.md) for major OS upgrade guidance.

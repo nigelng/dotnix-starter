@@ -67,6 +67,18 @@ in
 
       SoftwareUpdate.AutomaticallyInstallMacOSUpdates = systemConfig.automaticallyInstallMacOSUpdates;
 
+      loginwindow = {
+        # Do not set autoLoginUser — leave null so macOS does not enable auto-login.
+        GuestEnabled = false;
+      };
+
+      screensaver = {
+        # Prefer requiring a password immediately when waking from screensaver.
+        # Modern Lock Screen settings can still drift; verify after switch.
+        askForPassword = true;
+        askForPasswordDelay = 0;
+      };
+
       finder = {
         # show full POSIX path as Finder window title
         _FXShowPosixPathInTitle = false;
@@ -115,8 +127,14 @@ in
     applicationFirewall = {
       enable = true;
       enableStealthMode = true;
+      # Explicit Apple defaults when the firewall is on (signed system + downloaded apps).
+      allowSigned = true;
+      allowSignedApp = true;
     };
   };
+
+  # Keep Remote Login off unless an overlay intentionally enables it.
+  services.openssh.enable = false;
 
   security.pam.services.sudo_local = {
     reattach = true;

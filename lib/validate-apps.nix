@@ -19,18 +19,6 @@ let
   firefoxAddons =
     if loadFirefoxConfig == null then null else import ../home/firefox/addons.nix { inherit pkgs lib; };
 
-  validateFirefoxPackage =
-    hostName:
-    if loadFirefoxConfig == null then
-      [ ]
-    else
-      let
-        firefoxConfig = loadFirefoxConfig hostName;
-      in
-      lib.optional ((pkgs.${firefoxConfig.package} or null) == null) ''
-        ${hostName}: unknown Firefox package: ${firefoxConfig.package}
-      '';
-
   validateFirefoxExtensions =
     hostName:
     if loadFirefoxConfig == null || firefoxAddons == null then
@@ -83,7 +71,6 @@ let
         ++ lib.optional (missingGoogleFonts fontConfig.google != [ ]) ''
           ${hostName}: unknown google fonts: ${lib.concatStringsSep ", " (missingGoogleFonts fontConfig.google)}
         ''
-        ++ validateFirefoxPackage hostName
         ++ validateFirefoxExtensions hostName
         ++ validateAndroidJdk hostName;
     in

@@ -4,25 +4,54 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
 
+### Added
 
-## [1.0.2] - 2026-07-15
+- Firefox default add-on: Privacy Badger (`privacy-badger17`)
 
+### Changed
+
+- Install Firefox via the Homebrew `firefox` cask; home-manager manages profile, settings, and extensions only (`my.firefox.package = null` by default)
+- Remove `package` from Firefox JSON config and schema (use apps casks / optional `my.firefox.package` override instead)
+
+## [1.0.4] - 2026-09-20
+
+### Added
+
+- `docs/SECURITY.md` trust model and post-install checklist; `docs/MACOS-27.md` readiness notes
+- JSON Schema for apps and fonts; host schema fields for power / Software Update overrides
+- Shared `resolvePkg` helper; Android disabled fixture (`config/android/base.json`)
+- Agent nixfmt gate (`AGENTS.md`, `.cursor/rules/nixfmt.mdc`, pre-commit format+check)
 
 ### Fixed
 
-- ci: indent multiline string in release workflow YAML (#12)
+- Google Fonts OTF install path
+- Host JSON validation coverage (schemas, Android fixture, safer failure modes)
 
-- fonts: use MesloLGMDZ Nerd Font Mono and install meslo-lg (#13)
+### Changed
 
-
-> Versions before 1.0.0 used date-only headers (no semver tag).
+- Harden declarative defaults: disable guest login and Remote Login, require screensaver password
+- Safer VS Code workspace trust and Homebrew defaults
+- Pin GitHub Actions by commit SHA; document firewall / FileVault / Gatekeeper out-of-band steps
 
 ## [1.0.3] - 2026-07-23
 
 ### Added
 
 - `platformVersions`, `systemImageTypes`, and `abiVersions` options on `my.android` — replaces the default full SDK with `composeAndroidPackages` so overlay configs can pin specific API levels, image types, and ABIs (e.g. API 35 `google_apis_playstore` `arm64-v8a` only, ~4 GB vs ~63 GB)
+
+### Changed
+
+- Update flake inputs (#16)
+- Bump `softprops/action-gh-release` from 2 to 3 (#15)
+
+## [1.0.2] - 2026-07-15
+
+### Fixed
+
+- ci: indent multiline string in release workflow YAML (#12)
+- fonts: use MesloLGMDZ Nerd Font Mono and install meslo-lg (#13)
 
 ## [1.0.1] - 2026-07-14
 
@@ -60,6 +89,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `flake.nix` refactored to use `overlayFlakeOutputs` internally
 - Silence `DIRENV_LOG_FORMAT` when direnv is enabled (fixes p10k instant-prompt noise)
 - `update-flake` workflow: `WORKFLOW_PAT` fallback and clearer failure message when Actions cannot open PRs
+
+> Versions before 1.0.0 used date-only headers (no semver tag).
 
 ## [2026-07-06]
 

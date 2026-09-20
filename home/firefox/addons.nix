@@ -45,6 +45,12 @@ let
       url = "https://addons.mozilla.org/firefox/downloads/file/4805625/adguard_adblocker-5.4.3.1.xpi";
       hash = "sha256-NKAzwTSD1Pif/0RP67xMNNdCqcUR6vscfthcwBhGF+c";
     };
+    "privacy-badger17" = {
+      name = "privacy-badger17";
+      addonId = "jid1-MnnxcxisBPnSXQ@jetpack";
+      url = "https://addons.mozilla.org/firefox/downloads/file/5032646/privacy_badger17-2026.9.15.xpi";
+      hash = "sha256-l82JEeNIbaNKUyp8fygGzW0M+hF6H75eh0cEKpRELWI=";
+    };
   };
 
   # Resolve a list of slugs to addon packages.

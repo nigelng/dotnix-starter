@@ -1,7 +1,9 @@
 # Firefox backup browser via home-manager programs.firefox.
 #
-# JSON defaults (config/firefox/base.json) seed the my.firefox option defaults.
-# Overlay consumers can override any option (settings, extensions, package).
+# Install the Firefox app via Homebrew cask (config/apps casks: "firefox").
+# This module manages profile, settings, and extensions only (package = null
+# by default, same pattern as VS Code). Overlay consumers can override settings,
+# extensions, or force a nixpkgs Firefox via my.firefox.package.
 # Extensions are installed via home.file symlinks into the profile's extensions/
 # directory (useDeclarativeExtensions = false, the default), with force = true and
 # a post-switch activation that re-links and lists the directory.
@@ -33,9 +35,13 @@ in
     enable = lib.mkEnableOption "Firefox backup browser";
 
     package = lib.mkOption {
-      type = lib.types.package;
-      default = pkgs.${firefoxConfig.package or "firefox-bin"};
-      description = "Firefox package to install.";
+      type = lib.types.nullOr lib.types.package;
+      default = null;
+      description = ''
+        Firefox package for programs.firefox. Null (default) means HM does not
+        install the app — use the Homebrew firefox cask. Set to a nixpkgs
+        package (e.g. pkgs.firefox-bin) to install via Nix instead.
+      '';
     };
 
     profileName = lib.mkOption {
@@ -67,7 +73,7 @@ in
       default = false;
       description = ''
         Use programs.firefox declarative extensions instead of home.file symlinks.
-        May not work reliably with firefox-bin on macOS; disabled by default.
+        May not work reliably with a Homebrew-installed Firefox on macOS; disabled by default.
       '';
     };
   };

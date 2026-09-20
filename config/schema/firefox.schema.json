@@ -5,11 +5,6 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "package": {
-      "type": "string",
-      "minLength": 1,
-      "description": "nixpkgs Firefox package attribute name (e.g. firefox-bin)."
-    },
     "profileName": {
       "type": "string",
       "minLength": 1,

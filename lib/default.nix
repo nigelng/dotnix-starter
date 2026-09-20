@@ -156,7 +156,6 @@ let
       # home/firefox.nix accepts firefoxConfig ? { } and my.firefox.enable
       # defaults to false in overlays, so Firefox won't activate.
       {
-        package = "firefox-bin";
         profileName = "default";
         settings = { };
         extensions = {
@@ -176,12 +175,11 @@ let
               loadFirefoxConfig: missing ${hostPath}
               Add config/firefox/hosts/${hostName}.json for each entry in config/hosts.json (use {} if there are no host-only Firefox overrides).
             '';
-        # Host package/profileName override base if present.
-        package = if host ? package then host.package else base.package or "firefox-bin";
+        # Host profileName overrides base if present.
         profileName = if host ? profileName then host.profileName else base.profileName or "default";
       in
       {
-        inherit package profileName;
+        inherit profileName;
         settings = mergeSettings base host;
         extensions = mergeExtensions base host;
       };

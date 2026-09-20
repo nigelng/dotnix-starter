@@ -4,6 +4,6 @@
   "taps": [],
   "trustedCasks": {},
   "brews": ["mas"],
-  "casks": [],
+  "casks": ["firefox"],
   "user": ["fd"]
 }

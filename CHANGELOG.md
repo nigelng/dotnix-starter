@@ -27,10 +27,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Firefox default add-on: Privacy Badger (`privacy-badger17`)
 
+### Fixed
+
+- Install Firefox add-ons via `ExtensionSettings` policies (pinned AMO file URLs) so Homebrew Firefox actually registers them (profile XPI sideloads were ignored)
+
 ### Changed
 
-- Install Firefox via the Homebrew `firefox` cask; home-manager manages profile, settings, and extensions only (`my.firefox.package = null` by default)
-- Remove `package` from Firefox JSON config and schema (use apps casks / optional `my.firefox.package` override instead)
+- Install Firefox via the Homebrew `firefox` cask only; home-manager manages profile, settings, and extensions with `package = null` always (no nixpkgs Firefox)
+- Remove `my.firefox.package`, `nixExtensions`, and `useDeclarativeExtensions`; default `extensionInstallMode = "policy"`
+- Drop sideload-only prefs (`extensions.autoDisableScopes` / `enabledScopes`) from unconditional Firefox base settings
 - Update flake inputs (nixpkgs)
 
 ## [1.0.4] - 2026-09-20

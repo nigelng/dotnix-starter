@@ -31,7 +31,7 @@
             "type": "string",
             "minLength": 1
           },
-          "description": "AMO add-on slugs resolved at build time via fetchFirefoxAddon."
+          "description": "AMO add-on slugs from the curated catalog; installed via ExtensionSettings (pinned install_url) by default."
         },
         "manual": {
           "type": "array",

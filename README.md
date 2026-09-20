@@ -244,7 +244,7 @@ See: `home/zsh.nix`, [docs/SECURITY.md](docs/SECURITY.md).
 
 ### Firefox (backup browser)
 
-[Mozilla Firefox](https://www.mozilla.org/firefox/) is installed as a backup browser via the Homebrew `firefox` cask (`config/apps/base.json`). home-manager `programs.firefox` manages the profile, settings, and extensions only (`my.firefox.package = null` by default — same pattern as VS Code). It ships with four AMO add-ons — **Dark Reader**, **1Password**, **AdGuard AdBlocker**, and **Privacy Badger** — plus a privacy-hardened profile (telemetry opt-out, DNS-over-HTTPS via Cloudflare, fingerprinting resistance, strict content blocking). The configuration is JSON-driven and extendable by both standalone users and overlay consumers.
+[Mozilla Firefox](https://www.mozilla.org/firefox/) is installed as a backup browser via the Homebrew `firefox` cask (`config/apps/base.json`). home-manager `programs.firefox` manages the profile, settings, and extensions only (`package = null` always — same pattern as VS Code; **no nixpkgs Firefox**). It ships with four AMO add-ons — **Dark Reader**, **1Password**, **AdGuard AdBlocker**, and **Privacy Badger** — plus a privacy-hardened profile (telemetry opt-out, DNS-over-HTTPS via Cloudflare, fingerprinting resistance, strict content blocking). The configuration is JSON-driven and extendable by both standalone users and overlay consumers.
 
 **Add-ons installed by default:**
 
@@ -280,9 +280,9 @@ All settings are consumer-overridable via `my.firefox.settings` (Nix) or per-hos
 
 **How extensions are installed:**
 
-By default (`my.firefox.useDeclarativeExtensions = false`), add-ons are installed via `home.file` symlinks (`force = true`) into the Firefox profile's `extensions/` directory. A post-switch activation re-links each XPI and prints `ls -la` of that directory so extensions are restored if Firefox removed them since the last switch. `extensions.autoDisableScopes = 0` is set when add-ons are configured so sideloaded extensions stay enabled (see [docs/SECURITY.md](docs/SECURITY.md)).
+By default (`my.firefox.extensionInstallMode = "policy"`), add-ons are installed via `programs.firefox.policies.ExtensionSettings` (`force_installed` + pinned AMO **file** URLs from the catalog / `manual` entries). home-manager writes these into Darwin defaults (`org.mozilla.firefox.plist`) so Homebrew Firefox applies them. First launch (or restart after switch) needs network so Firefox can fetch the XPIs. Extension auto-update prefs stay off — bump catalog/manual URLs intentionally to change versions (see [docs/SECURITY.md](docs/SECURITY.md)).
 
-For a stricter trust model, set `my.firefox.useDeclarativeExtensions = true` so home-manager wires `programs.firefox.profiles.<name>.extensions.packages` instead of profile sideloads.
+Official Firefox builds ignore new profile-directory XPI sideloads, so the old `home.file` symlink path is not the default.
 
 **Overriding in an overlay:**
 
@@ -290,6 +290,8 @@ The thin overlay path (`darwinConfigurationsBuilder`) includes the Firefox modul
 
 1. Add `"firefox"` to your apps `casks` (e.g. `config/apps/base.json`), same as VS Code / Ghostty.
 2. Either create `config/firefox/base.json` (which enables HM Firefox automatically) or set `my.firefox.enable = true` in your `extraHomeModules`.
+
+Default add-ons from starter JSON install via policies automatically after you bump this flake — no hand-written `ExtensionSettings` required. If an overlay previously duplicated `programs.firefox.policies.ExtensionSettings` as a brew workaround, **remove** that and keep/restore JSON `extensions.nix` slugs (or `manual`) so starter owns the policy list.
 
 ```nix
 home-manager.users.myuser = {
@@ -299,20 +301,12 @@ home-manager.users.myuser = {
   my.firefox.settings = {
     "browser.startup.homepage" = "https://example.com";
   };
-  # Add extra nixpkgs/NUR extension packages
-  my.firefox.nixExtensions = [ someAddonPkg ];
-  # Use declarative extensions instead of home.file symlinks
-  my.firefox.useDeclarativeExtensions = true;
-  # Optional: install Firefox via nixpkgs instead of the Homebrew cask
-  # my.firefox.package = pkgs.firefox-bin;
 };
 ```
 
-If you previously used nixpkgs `firefox-bin`, remove that app (and any leftover Nix-managed `Firefox.app`) after switching to the cask so you do not keep two installs.
-
 **Adding non-AMO extensions:**
 
-Consumers can add custom XPI add-ons via `my.firefox.manualExtensions` (or the JSON `extensions.manual` array). Each entry requires `name`, `addonId`, `url`, and `hash` (SRI format):
+Consumers can add custom XPI add-ons via `my.firefox.manualExtensions` (or the JSON `extensions.manual` array). Each entry requires `name`, `addonId`, `url`, and `hash` (SRI format; `hash` is required by schema and used if you opt into sideload mode):
 
 ```nix
 my.firefox.manualExtensions = [
@@ -335,7 +329,7 @@ Home-manager will back up any existing files in `~/Library/Application Support/F
 
 **Verifying add-ons:**
 
-After switching, launch Firefox and open `about:addons` to confirm Dark Reader, 1Password, AdGuard AdBlocker, and Privacy Badger are installed and enabled. Open `about:config` to verify the settings from `config/firefox/base.json`.
+After switching, **quit and relaunch Firefox**, then open `about:policies` (ExtensionSettings should list the force-installed add-ons) and `about:addons` to confirm Dark Reader, 1Password, AdGuard AdBlocker, and Privacy Badger are installed and enabled. Optionally check Darwin defaults include enterprise policies, e.g. `defaults read org.mozilla.firefox`. Open `about:config` to verify the settings from `config/firefox/base.json`.
 
 See: `home/firefox.nix`, `home/firefox/addons.nix`, `config/firefox/base.json`.
 

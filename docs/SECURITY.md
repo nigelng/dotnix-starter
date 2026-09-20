@@ -51,10 +51,12 @@ nix-darwin does **not** manage disk encryption or Gatekeeper assessment policy. 
 
 ## Firefox
 
-- The Firefox **app** comes from the Homebrew `firefox` cask (not nixpkgs). home-manager manages profile, settings, and extensions only (`my.firefox.package = null` by default).
-- Add-ons are content-addressed (`fetchFirefoxAddon` + sha256 in `home/firefox/addons.nix`). Auto-update prefs are off so CVE fixes need intentional hash bumps.
-- Default install path sideloads XPIs and sets `extensions.autoDisableScopes = 0` so they stay enabled. Prefer `my.firefox.useDeclarativeExtensions = true` for a stricter trust model.
-- `extensions.manual` accepts arbitrary URL + hash — treat host JSON as trusted input.
+- The Firefox **app** comes from the Homebrew `firefox` cask only. home-manager never installs Firefox from nixpkgs (`programs.firefox.package = null` always).
+- Default add-ons use enterprise `ExtensionSettings` (`force_installed`) with **pinned** AMO file URLs from `home/firefox/addons.nix` / `extensions.manual`. Firefox fetches Mozilla-signed XPIs at first launch or after policy apply (HTTPS + AMO + Mozilla signing).
+- **Trust gap vs Nix store:** policy install does **not** verify sha256 at `nix switch`. Mitigations: pin file URLs in git, keep `extensions.update.enabled` / `autoUpdateDefault` false, bump catalog/manual URLs intentionally for CVE fixes.
+- Do **not** duplicate starter `addonId`s in overlay `ExtensionSettings` — starter owns the force-installed list from JSON; overlays should use `extensions.nix` slugs or `manual` entries.
+- `extensions.manual` accepts arbitrary URL + hash — treat host JSON as trusted input (a malicious URL compromises the profile).
+- Profile-dir XPI sideload (`extensionInstallMode = "sideload"`) is an undocumented escape hatch only; official/Homebrew Firefox builds typically ignore new sideloads.
 - DoH mode `2` falls back to system DNS; set `network.trr.mode` to `3` in `config/firefox/` for DoH-only.
 
 ## Editors

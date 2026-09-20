@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Install Firefox via the Homebrew `firefox` cask; home-manager manages profile, settings, and extensions only (`my.firefox.package = null` by default)
 - Remove `package` from Firefox JSON config and schema (use apps casks / optional `my.firefox.package` override instead)
+- Update flake inputs (nixpkgs)
 
 ## [1.0.4] - 2026-09-20
 

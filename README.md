@@ -567,7 +567,7 @@ pre-commit install
 pre-commit run --all-files
 ```
 
-Hooks (see `.pre-commit-config.yaml`): `nix fmt --check` on `*.nix`, `shellcheck` on `scripts/*.sh` and `build-darwin.sh`. Not required for CI.
+Hooks (see `.pre-commit-config.yaml`): **`nix fmt`** (writes, then `--check`) on `*.nix`, `shellcheck` on `scripts/*.sh` and `build-darwin.sh`. Agents must also run `nix fmt` before committing Nix (see [AGENTS.md](AGENTS.md) and `.cursor/rules/nixfmt.mdc`). Not required for CI beyond the flake `fmt` job.
 
 ### Releasing
 

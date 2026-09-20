@@ -1,5 +1,5 @@
 # machineType presets for networking and power settings.
-{ lib }:
+{ ... }:
 
 {
   laptop = {

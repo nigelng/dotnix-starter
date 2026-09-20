@@ -8,16 +8,10 @@
   ...
 }:
 let
-  # Flake check validates names first; throws here catch anything at switch time.
-  resolvePkg =
-    name:
-    if !lib.hasAttr name pkgs then
-      throw "Unknown system package in app config: ${name}"
-    else
-      pkgs.${name};
+  inherit ((import ../lib/resolve-pkg.nix { inherit lib; })) resolvePkg;
 
-  systemApps = map resolvePkg appConfig.system;
-  homebrewCleanup = systemConfig.homebrewCleanup or "zap";
+  systemApps = map (resolvePkg pkgs "system package") appConfig.system;
+  homebrewCleanup = systemConfig.homebrewCleanup or "check";
 
   # Non-official tap casks need a fully-qualified name and trusted: true (not whole-tap trust).
   homebrewCask =
@@ -41,6 +35,7 @@ in
     package = pkgs.nix;
 
     settings = {
+      # adminUsername is always trusted; trustedUsers adds extras. Never add "*".
       trusted-users = [ userConfig.user ] ++ systemConfig.trustedUsers;
       allowed-users = [ userConfig.user ] ++ systemConfig.allowedUsers;
       auto-optimise-store = true;

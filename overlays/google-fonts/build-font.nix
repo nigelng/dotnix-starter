@@ -30,7 +30,7 @@ stdenvNoCC.mkDerivation {
   installPhase = ''
     runHook preInstall
 
-    mkdir -p $out/share/fonts/truetype
+    mkdir -p $out/share/fonts/truetype $out/share/fonts/opentype
     cp ${path}/*.ttf $out/share/fonts/truetype/ 2>/dev/null || true
     cp ${path}/*.otf $out/share/fonts/opentype/ 2>/dev/null || true
 

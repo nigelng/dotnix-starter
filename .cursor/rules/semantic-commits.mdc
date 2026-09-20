@@ -1,0 +1,35 @@
+---
+description: Conventional Commits for PR titles and commits
+globs:
+alwaysApply: true
+---
+
+# Semantic commits
+
+This repository uses [Conventional Commits](https://www.conventionalcommits.org/).
+
+## Format
+
+```
+<type>[optional scope][optional !]: <description>
+```
+
+## Allowed types
+
+`feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
+
+## Rules
+
+- Description starts with a lowercase letter
+- Imperative mood (e.g. "add schema", not "adds" or "Added")
+- No trailing period
+- PR titles must match the same pattern (enforced by `.github/workflows/fix-pr-title.yml`)
+
+## Examples
+
+```
+feat(android): configurable platformVersions
+fix(fonts): create opentype dir for OTF installs
+docs: add macOS 27 readiness checklist
+chore: update flake inputs
+```

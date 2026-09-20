@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nigelng/dotnix-starter/config/schema/apps.schema.json",
+  "title": "Apps config (system/user packages and Homebrew)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "system": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "nixpkgs attributes installed as systemPackages."
+    },
+    "user": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "nixpkgs attributes installed as home.packages (granted is special-cased)."
+    },
+    "taps": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Homebrew taps."
+    },
+    "brews": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Homebrew formulae."
+    },
+    "casks": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Homebrew casks. Non-official tap casks also need trustedCasks."
+    },
+    "trustedCasks": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "minLength": 1 },
+      "description": "Map of cask name → tap for non-official tap casks (per-cask trust, not whole-tap)."
+    },
+    "mas": {
+      "type": "object",
+      "additionalProperties": { "type": "integer" },
+      "description": "Mac App Store apps: display name → mas app ID."
+    }
+  }
+}

@@ -7,9 +7,17 @@
   ...
 }:
 let
-  pkgsFonts = builtins.map (app: builtins.getAttr app pkgs) fontConfig.pkgs;
-  nerdFonts = builtins.map (app: builtins.getAttr app pkgs.nerd-fonts) fontConfig.nerd;
-  googleFonts = builtins.map (name: pkgs.${"google-fonts-" + name}) fontConfig.google;
+  inherit ((import ../lib/resolve-pkg.nix { inherit lib; })) resolvePkg resolveAttr;
+
+  pkgsFonts = map (resolvePkg pkgs "font package") fontConfig.pkgs;
+  nerdFonts = map (resolveAttr pkgs.nerd-fonts "nerd font") fontConfig.nerd;
+  googleFonts = map (
+    name:
+    let
+      attr = "google-fonts-" + name;
+    in
+    resolvePkg pkgs "google font" attr
+  ) fontConfig.google;
 in
 {
   system = {
@@ -57,7 +65,8 @@ in
         SortColumn = "CPUUsage";
       };
 
-      SoftwareUpdate.AutomaticallyInstallMacOSUpdates = true;
+      SoftwareUpdate.AutomaticallyInstallMacOSUpdates =
+        systemConfig.automaticallyInstallMacOSUpdates;
 
       finder = {
         # show full POSIX path as Finder window title

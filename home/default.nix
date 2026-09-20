@@ -12,17 +12,11 @@
 let
   theme = import ./themes/default.nix;
 
-  # Flake check validates names first; throws here catch anything at switch time.
-  resolvePkg =
-    name:
-    if !lib.hasAttr name pkgs then
-      throw "Unknown user package in app config: ${name}"
-    else
-      pkgs.${name};
+  inherit ((import ../lib/resolve-pkg.nix { inherit lib; })) resolvePkg;
 
   # granted is installed via programs.granted (package + zsh assume integration).
   userAppNames = lib.filter (a: a != "granted") appConfig.user;
-  userApps = map resolvePkg userAppNames;
+  userApps = map (resolvePkg pkgs "user package") userAppNames;
 in
 {
   imports = [

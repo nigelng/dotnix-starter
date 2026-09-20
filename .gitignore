@@ -15,4 +15,6 @@ config/user.json
 .idea/
 .devin/
 .vscode/
-.cursor/
+.cursor/**
+!.cursor/rules/
+!.cursor/rules/**

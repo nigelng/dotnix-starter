@@ -6,7 +6,7 @@
   "adminUsername": "youruser",
   "screenshotFolder": "~/Desktop/Screenshots",
   "homebrewPrefix": "/opt/homebrew",
-  "homebrewCleanup": "zap",
+  "homebrewCleanup": "check",
   "trustedUsers": [],
   "allowedUsers": ["youruser"]
 }

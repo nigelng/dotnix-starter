@@ -1,4 +1,5 @@
-# Fail flake check when app/font config references unknown nixpkgs attributes.
+# Fail flake check when app/font config references unknown nixpkgs attributes
+# or Firefox extension slugs missing from the curated catalog.
 {
   lib,
   pkgs,
@@ -15,6 +16,12 @@ let
 
   missingGoogleFonts = names: lib.filter (n: (pkgs.${"google-fonts-" + n} or null) == null) names;
 
+  firefoxAddons =
+    if loadFirefoxConfig == null then
+      null
+    else
+      import ../home/firefox/addons.nix { inherit pkgs lib; };
+
   validateFirefoxPackage =
     hostName:
     if loadFirefoxConfig == null then
@@ -25,6 +32,21 @@ let
       in
       lib.optional ((pkgs.${firefoxConfig.package} or null) == null) ''
         ${hostName}: unknown Firefox package: ${firefoxConfig.package}
+      '';
+
+  validateFirefoxExtensions =
+    hostName:
+    if loadFirefoxConfig == null || firefoxAddons == null then
+      [ ]
+    else
+      let
+        firefoxConfig = loadFirefoxConfig hostName;
+        slugs = firefoxConfig.extensions.nix or [ ];
+        unknown = lib.filter (s: !(firefoxAddons.catalog ? ${s})) slugs;
+      in
+      lib.optional (unknown != [ ]) ''
+        ${hostName}: unknown Firefox extension slugs: ${lib.concatStringsSep ", " unknown}
+        Valid slugs: ${lib.concatStringsSep ", " (builtins.attrNames firefoxAddons.catalog)}
       '';
 
   validateAndroidJdk =
@@ -65,6 +87,7 @@ let
           ${hostName}: unknown google fonts: ${lib.concatStringsSep ", " (missingGoogleFonts fontConfig.google)}
         ''
         ++ validateFirefoxPackage hostName
+        ++ validateFirefoxExtensions hostName
         ++ validateAndroidJdk hostName;
     in
     if errors == [ ] then null else lib.concatStringsSep "\n" errors;

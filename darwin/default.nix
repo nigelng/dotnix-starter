@@ -1,7 +1,6 @@
 # One nix-darwin configuration per entry in config/hosts.json.
 {
   lib,
-  pkgs,
   hosts,
   flakeRoot,
   loadHostConfig,
@@ -15,6 +14,7 @@
   system,
   gitConfig,
   editorTooling,
+  mkWritableCopyActivation,
   extraHomeModules ? [ ],
   ...
 }:
@@ -28,10 +28,6 @@ lib.genAttrs hosts (
     firefoxConfig = loadFirefoxConfig hostName;
     androidConfig = loadAndroidConfig hostName;
     userConfig = loadUserConfig hostName;
-    mkWritableCopyActivation = import ../lib/mk-writable-copy-activation.nix {
-      hmLib = home-manager.lib;
-      inherit lib pkgs;
-    };
   in
   darwin.lib.darwinSystem {
     inherit system;

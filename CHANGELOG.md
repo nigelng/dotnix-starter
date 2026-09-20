@@ -4,28 +4,7 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-
-
-## [1.0.5] - 2026-09-20
-
-
-### Added
-
-- firefox: install via Homebrew cask and add Privacy Badger (#22)
-
-
-### Changed
-
-- update flake inputs (#19)
-
-- update flake inputs (#23)
-
-
 ## [Unreleased]
-
-### Added
-
-- Firefox default add-on: Privacy Badger (`privacy-badger17`)
 
 ### Fixed
 
@@ -36,7 +15,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Install Firefox via the Homebrew `firefox` cask only; home-manager manages profile, settings, and extensions with `package = null` always (no nixpkgs Firefox)
 - Remove `my.firefox.package`, `nixExtensions`, and `useDeclarativeExtensions`; default `extensionInstallMode = "policy"`
 - Drop sideload-only prefs (`extensions.autoDisableScopes` / `enabledScopes`) from unconditional Firefox base settings
-- Update flake inputs (nixpkgs)
+
+## [1.0.5] - 2026-09-20
+
+### Added
+
+- firefox: install via Homebrew cask and add Privacy Badger (#22)
+
+### Changed
+
+- update flake inputs (#19)
+- update flake inputs (#23)
 
 ## [1.0.4] - 2026-09-20
 

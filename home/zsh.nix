@@ -20,6 +20,9 @@
     '')
   ];
 
+  # Override neovim defaultEditor (sets VISUAL=nvim) so GUI tools open Cursor.
+  home.sessionVariables.VISUAL = lib.mkForce "cursor";
+
   # HM symlinks ~/.p10k.zsh from the store (read-only); p10k configure must write the file.
   home.activation.p10kConfigWritable = mkWritableCopyActivation [
     "${config.home.homeDirectory}/.p10k.zsh"
@@ -57,7 +60,7 @@
 
     sessionVariables = {
       EDITOR = "nvim";
-      VISUAL = "code";
+      VISUAL = "cursor";
     }
     // lib.optionalAttrs config.programs.granted.enable {
       # Skip Granted's interactive ~/.zshenv alias installer (we manage assume below).

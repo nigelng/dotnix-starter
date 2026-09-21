@@ -1,6 +1,8 @@
-# VS Code and Cursor: extensions + user settings via home-manager.
-# Editors are installed as system packages (config/apps/base.json); HM manages config only.
-# Cursor pins older extensions (VS Code engine ~1.105); VS Code uses current nixpkgs versions.
+# Cursor (+ optional Devin settings): extensions and user settings via home-manager.
+# Install the Cursor app via apps JSON (e.g. code-cursor cask); HM manages config only.
+# commonBase in ./vscode/extensions.nix is the Cursor HM extension set (and reinstate base for VS Code).
+# Devin (when casked) shares the settings pipeline only — not commonBase extension installs.
+# Nix IDE, Python Environments, and Pylance are CLI-pinned for Cursor (engine lags upstream).
 {
   config,
   pkgs,
@@ -12,8 +14,7 @@
 }:
 let
   sharedSettings = import ./vscode/shared-settings.nix { inherit lib; };
-  hasFlutter = lib.elem "flutter" appConfig.user;
-  extensionSets = import ./vscode/extensions.nix { inherit pkgs lib hasFlutter; };
+  extensionSets = import ./vscode/extensions.nix { inherit pkgs lib; };
 
   hasDevin = lib.elem "devin-desktop" appConfig.casks;
 
@@ -50,18 +51,10 @@ let
     prettier.prettierPath = "${editorToolingHome}/node_modules/prettier";
   };
 
-  flutterSettings = lib.optionalAttrs hasFlutter {
-    "dart.flutterSdkPath" = "${pkgs.flutter}";
-    "dart.sdkPath" = "${pkgs.flutter}/bin/cache/dart-sdk";
-  };
-
   cursorObsoleteKeyPrefixes = [
     "jnoortheen.nix-ide"
     "ms-python.vscode-python-envs"
-  ]
-  ++ lib.optionals hasFlutter [
-    "Dart-Code.dart-code"
-    "Dart-Code.flutter"
+    "ms-python.vscode-pylance"
   ];
 
   cursorObsoleteJqFilter =
@@ -71,18 +64,11 @@ let
     "with_entries(select((.key | ${prefixTests}) | not))";
 
   mkEditorSettings =
-    extras:
-    lib.recursiveUpdate sharedSettings (nixToolPaths // jsLintSettings // flutterSettings // extras);
+    extras: lib.recursiveUpdate sharedSettings (nixToolPaths // jsLintSettings // extras);
 
-  vscodeSettings = mkEditorSettings {
-    chat.editor.fontFamily = sharedSettings.editor.fontFamily;
-    chat.editor.fontSize = 14;
-    chat.mcp.gallery.enabled = true;
-    githubPullRequests.pullBranch = "never";
-    terminal.external.osxExec = "ghostty.app";
-    workbench.settings.applyToAllProfiles = applyToAllProfiles;
-  };
-
+  # Shared settings pipeline: Cursor (active) and Devin (when cask present).
+  # Future VS Code: mkEditorSettings { …vscode-only prefs… } + programs.vscode = mkEditor "vscode" …
+  # with extensions = commonBase ++ [ nixIdeVscode pythonEnvsVscode pylanceVscode ] (++ optional vscodeOnly).
   devinSettings = mkEditorSettings {
     workbench.settings.applyToAllProfiles = applyToAllProfiles;
   };
@@ -106,26 +92,11 @@ let
   cursorPinnedExtensions = [
     "jnoortheen.nix-ide"
     "ms-python.vscode-python-envs"
-  ]
-  ++ lib.optionals hasFlutter [
-    "Dart-Code.dart-code"
-    "Dart-Code.flutter"
-  ];
-
-  devinPinnedExtensions = lib.optionals (hasFlutter && hasDevin) [
-    {
-      id = "Dart-Code.dart-code";
-      path = "${pkgs.vscode-extensions.dart-code.dart-code}";
-    }
-    {
-      id = "Dart-Code.flutter";
-      path = "${pkgs.vscode-extensions.dart-code.flutter}";
-    }
+    "ms-python.vscode-pylance"
   ];
 
   # VS Code-family editors rewrite settings.json on startup; HM store symlinks are read-only.
   editorUserSettingsPaths = [
-    "${config.home.homeDirectory}/Library/Application Support/Code/User/settings.json"
     "${config.home.homeDirectory}/Library/Application Support/Cursor/User/settings.json"
   ]
   ++ lib.optionals hasDevin [
@@ -147,28 +118,9 @@ let
     done
   '';
 
-  installDevinPinnedExtensions = pkgs.writeShellScript "install-devin-pinned-extensions" ''
-    set -euo pipefail
-    if ! command -v devin-desktop >/dev/null 2>&1; then
-      exit 0
-    fi
-    listed=$(devin-desktop --list-extensions 2>/dev/null || true)
-    ${lib.concatMapStrings (
-      { id, path }:
-      let
-        escapedPath = lib.escapeShellArg path;
-      in
-      ''
-        if ! printf '%s\n' "$listed" | grep -qx "${id}"; then
-          devin-desktop --install-extension ${escapedPath} --force
-        fi
-      ''
-    ) devinPinnedExtensions}
-  '';
-
 in
 {
-  programs.vscode = mkEditor "vscode" vscodeSettings;
+  # VS Code HM path intentionally disabled; reinstate via mkEditor + commonBase (see extensions.nix).
   programs.cursor = mkEditor "cursor" cursorSettings;
 
   home.activation.editorUserSettingsWritable = mkWritableEditorSettingsActivation editorUserSettingsPaths;
@@ -189,12 +141,6 @@ in
       ''
         ${installCursorPinnedExtensions}
       '';
-
-  home.activation.installDevinPinnedExtensions = lib.mkIf (hasFlutter && hasDevin) (
-    lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      ${installDevinPinnedExtensions}
-    ''
-  );
 
   home.file."Library/Application Support/Devin/User/settings.json" = lib.mkIf hasDevin {
     text = builtins.toJSON devinSettings;

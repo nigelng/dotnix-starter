@@ -3,7 +3,7 @@
   "mas": {},
   "taps": [],
   "trustedCasks": {},
-  "brews": ["mas"],
+  "brews": ["mas", "mole"],
   "casks": ["firefox"],
   "user": ["fd"]
 }

@@ -1,4 +1,6 @@
 # Default formatters and on-save behavior for Prettier, ESLint, and EditorConfig.
+# Prettier is the sole formatter for its languages (including YAML). Prefer
+# CloudFormation Fn:: long form so Prettier-safe YAML does not need a CFN extension.
 { lib }:
 let
   prettierExt = "esbenp.prettier-vscode";
@@ -34,7 +36,7 @@ in
 {
   inherit prettierLangSettings;
 
-  # Prettier formats; ESLint fixes lint issues on save (not "explicit").
+  # Prettier formats; ESLint fixes lint issues on save (not as defaultFormatter).
   eslintSettings = {
     editor.codeActionsOnSave = {
       "source.fixAll.eslint" = "always";

@@ -16,7 +16,7 @@ Apple year-based releases (macOS 26 → **macOS 27**) move on a different schedu
    ```
 
    Override via `knownNetworkServices` in host JSON if labels changed (`lib/host-presets.nix`).
-5. Smoke-test PAM sudo (Touch ID / Apple Watch), `system.defaults`, Homebrew activation, Firefox / VS Code / Cursor paths under `~/Library/`.
+5. Smoke-test PAM sudo (Touch ID / Apple Watch), `system.defaults`, Homebrew activation, Firefox / Cursor paths under `~/Library/`.
 6. Confirm Homebrew still lives at `homebrewPrefix` (default `/opt/homebrew`) and `brew shellenv` works in zsh.
 
 ## CI
@@ -43,6 +43,6 @@ GitHub Actions currently use **`macos-14`**. When GitHub ships a runner image th
 | After merge | `darwin-rebuild switch` (or `./build-darwin.sh`) on each Mac; watch Homebrew / PAM |
 | Channel bump | Manual `flake.nix` ref change — not automatic |
 
-Optional: Cachix for faster CI (see README). Optional follow-up: automate AMO / VS Code extension hash bumps.
+Optional: Cachix for faster CI (see README). Optional follow-up: automate AMO / Cursor extension hash bumps.
 
 See also [SECURITY.md](SECURITY.md).

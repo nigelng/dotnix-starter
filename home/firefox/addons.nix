@@ -78,9 +78,6 @@ let
 
   # Merge entries into a single ExtensionSettings attrset.
   toExtensionSettings = entries: lib.foldl' (acc: entry: acc // toExtensionSetting entry) { } entries;
-
-  # Resolve a list of slugs to addon packages (sideload escape hatch).
-  resolveSlugs = slugs: map (slug: mkAddon (lookupSlug slug)) slugs;
 in
 {
   inherit
@@ -88,7 +85,6 @@ in
     mkAddon
     lookupSlug
     resolveSlugEntries
-    resolveSlugs
     toExtensionSetting
     toExtensionSettings
     ;

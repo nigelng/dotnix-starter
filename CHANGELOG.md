@@ -4,19 +4,29 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
 
+### Added
+
+- Pylance (`ms-python.vscode-pylance`) via Cursor CLI pin, and Code Spell Checker Australian English dictionary (`en-AU`)
+
+### Changed
+
+- Manage Cursor only via `home/vscode.nix` (disable VS Code HM); keep `commonBase` for Cursor HM and future VS Code reinstatement; Devin shares settings only
+- Drop Flutter/Dart editor support (extensions, SDK settings, Devin/Cursor pins)
+- Set `VISUAL=cursor` via `home.sessionVariables` (`mkForce` over neovim `defaultEditor`)
+- Prune obsolete Cursor extensions (Atom keybindings, Lorem Ipsum, TODO Highlight, Markdown GitHub styles, Color Highlight, ZipFS, Excalidraw, Jest, GitHub Pull Requests, nix-env-selector, QuitControl, hide-gitignored, Red Hat YAML)
+- Prettier is the sole formatter for its languages (including YAML); use CloudFormation `Fn::` long form (no CFN short-tag extension)
+- Disable editor telemetry (`telemetry.telemetryLevel = off` and legacy keys)
+- CLI-pin Pylance for Cursor alongside nix-ide and python-envs (not in HM `commonBase`, same as those pins)
+- Overlay note: `commonBase` already needs `nixpkgs.config.allowUnfree` (e.g. Git Graph); reinstating VS Code HM with `pylanceVscode` needs it too
+- Drop unused Firefox `resolveSlugs` helper (sideload uses `mkAddon` on resolved entries)
 
 ## [1.0.6] - 2026-09-20
 
 ### Breaking
 
 - firefox: install add-ons via ExtensionSettings for Homebrew (#25)
-
-
-### Fixed
-
-
-## [Unreleased]
 
 ### Fixed
 

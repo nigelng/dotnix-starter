@@ -6,6 +6,8 @@ let
 
   baseSettings = {
     cSpell.autoFormatConfigFile = true;
+    # Australian English (dictionary extension in commonBase).
+    cSpell.language = "en-AU";
     cSpell.customDictionaries.custom = {
       addWords = true;
       name = "user";
@@ -60,8 +62,6 @@ let
       "https://raw.githubusercontent.com/catppuccin/vscode/" = true;
     };
 
-    jest.runMode = "on-demand";
-
     nix.enableLanguageServer = true;
     nix.formatterPath = "nixfmt";
     nix.serverPath = "nil";
@@ -69,10 +69,12 @@ let
 
     prettier.useEditorConfig = true;
 
-    redhat.telemetry.enabled = false;
-
     scm.inputFontSize = 14;
     security.workspace.trust.untrustedFiles = "prompt";
+
+    telemetry.telemetryLevel = "off";
+    telemetry.enableTelemetry = false;
+    telemetry.enableCrashReporter = false;
 
     terminal.integrated.fontSize = 15;
     terminal.integrated.lineHeight = 1.25;
@@ -85,7 +87,7 @@ let
     workbench.sideBar.location = "left";
     workbench.startupEditor = "none";
 
-    # Layout — shared across VS Code, Cursor, Devin-desktop.
+    # Layout — shared across Cursor and Devin-desktop.
     workbench.panel.defaultLocation = "bottom";
     workbench.panel.opensMaximized = "never";
     workbench.editor.showTabs = "multiple";
@@ -95,36 +97,6 @@ let
     workbench.secondarySideBar.visible = true;
     window.menuBarVisibility = "compact";
     terminal.integrated.defaultLocation = "view";
-
-    yaml.customTags = [
-      "!And"
-      "!And sequence"
-      "!If"
-      "!If sequence"
-      "!Not"
-      "!Not sequence"
-      "!Equals"
-      "!Equals sequence"
-      "!Or"
-      "!Or sequence"
-      "!FindInMap"
-      "!FindInMap sequence"
-      "!Base64"
-      "!Join"
-      "!Join sequence"
-      "!Cidr"
-      "!Ref"
-      "!Sub"
-      "!Sub sequence"
-      "!GetAtt"
-      "!GetAZs"
-      "!ImportValue"
-      "!ImportValue sequence"
-      "!Select"
-      "!Select sequence"
-      "!Split"
-      "!Split sequence"
-    ];
   };
 in
 lib.foldl' lib.recursiveUpdate baseSettings [

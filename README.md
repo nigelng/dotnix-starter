@@ -18,7 +18,7 @@ This template is designed to work standalone **and** as a flake overlay — a pr
 
 - **direnv** (with **nix-direnv**)
 - **git** / **ssh** (1Password agent) / **gpg** (GPG agent for other uses; **commits sign with SSH** via 1Password — see Caveats)
-- **VS Code / Cursor modules** (`home/vscode.nix`) — add `vscode` / `code-cursor` (or install apps another way) via apps JSON when you want them managed by Nix
+- **Cursor module** (`home/vscode.nix` / `homeModules.vscode`) — manages Cursor extensions + settings (`package = null`); add `code-cursor` (or install another way) via apps JSON when you want Homebrew to manage the app. Devin (optional cask) shares the **settings** pipeline only; `commonBase` is the Cursor extension set (VS Code HM disabled but reinstate-ready)
 - **[eza](https://eza.rocks)** (modern `ls` replacement)
 - **[fzf](https://github.com/junegunn/fzf)** (Catppuccin Mocha colors)
 - **[zoxide](https://github.com/ajeetdsouza/zoxide)**
@@ -244,7 +244,7 @@ See: `home/zsh.nix`, [docs/SECURITY.md](docs/SECURITY.md).
 
 ### Firefox (backup browser)
 
-[Mozilla Firefox](https://www.mozilla.org/firefox/) is installed as a backup browser via the Homebrew `firefox` cask (`config/apps/base.json`). home-manager `programs.firefox` manages the profile, settings, and extensions only (`package = null` always — same pattern as VS Code; **no nixpkgs Firefox**). It ships with four AMO add-ons — **Dark Reader**, **1Password**, **AdGuard AdBlocker**, and **Privacy Badger** — plus a privacy-hardened profile (telemetry opt-out, DNS-over-HTTPS via Cloudflare, fingerprinting resistance, strict content blocking). The configuration is JSON-driven and extendable by both standalone users and overlay consumers.
+[Mozilla Firefox](https://www.mozilla.org/firefox/) is installed as a backup browser via the Homebrew `firefox` cask (`config/apps/base.json`). home-manager `programs.firefox` manages the profile, settings, and extensions only (`package = null` always — same pattern as Cursor; **no nixpkgs Firefox**). It ships with four AMO add-ons — **Dark Reader**, **1Password**, **AdGuard AdBlocker**, and **Privacy Badger** — plus a privacy-hardened profile (telemetry opt-out, DNS-over-HTTPS via Cloudflare, fingerprinting resistance, strict content blocking). The configuration is JSON-driven and extendable by both standalone users and overlay consumers.
 
 **Add-ons installed by default:**
 
@@ -288,7 +288,7 @@ Official Firefox builds ignore new profile-directory XPI sideloads, so the old `
 
 The thin overlay path (`darwinConfigurationsBuilder`) includes the Firefox module but disables it by default when `config/firefox/base.json` doesn't exist. To enable Firefox in an overlay:
 
-1. Add `"firefox"` to your apps `casks` (e.g. `config/apps/base.json`), same as VS Code / Ghostty.
+1. Add `"firefox"` to your apps `casks` (e.g. `config/apps/base.json`), same as Cursor / Ghostty.
 2. Either create `config/firefox/base.json` (which enables HM Firefox automatically) or set `my.firefox.enable = true` in your `extraHomeModules`.
 
 Default add-ons from starter JSON install via policies automatically after you bump this flake — no hand-written `ExtensionSettings` required. If an overlay previously duplicated `programs.firefox.policies.ExtensionSettings` as a brew workaround, **remove** that and keep/restore JSON `extensions.nix` slugs (or `manual`) so starter owns the policy list.
@@ -367,7 +367,7 @@ This template exposes `homeModules` and `darwinModules` as flake outputs so a pr
 | `homeModules.defaultWithFirefox` | Full home-manager module tree plus the Firefox backup browser module                                                                                                      |
 | `homeModules.git`                | Just the git/gh config module                                                                                                                                             |
 | `homeModules.vim`                | Just the neovim config module                                                                                                                                             |
-| `homeModules.vscode`             | Just the VS Code/Cursor config module                                                                                                                                     |
+| `homeModules.vscode`             | Cursor editor module (shared `commonBase`; VS Code HM path disabled)                                                                                                      |
 | `homeModules.zsh`                | Just the zsh config module                                                                                                                                                |
 | `homeModules.editor`             | Editor tooling (Prettier + ESLint from flake-pinned config repos)                                                                                                         |
 | `homeModules.firefox`            | Just the Firefox backup browser module (opt-in via `my.firefox.enable`)                                                                                                   |
@@ -621,7 +621,10 @@ Linux runners cannot build this flake; CI must stay on macOS.
 - [Trusted users](https://nixos.org/manual/nix/stable/command-ref/conf-file.html#conf-trusted-users) are the current user plus any listed in the host JSON. Default: `[<username>]`. Never use `"*"`.
 - [Allowed users](https://nixos.org/manual/nix/stable/command-ref/conf-file.html#conf-allowed-users) are the current user plus config. Default for new hosts: `[adminUsername]`. Never use `"*"`.
 - Guest login is disabled; Remote Login (`services.openssh`) is off; screensaver requires a password immediately. FileVault and Gatekeeper stay **out of band** — see [docs/SECURITY.md](docs/SECURITY.md).
-- `EDITOR=nvim` and `VISUAL=code` in zsh are intentional (terminal vs GUI default).
+- `EDITOR=nvim` and `VISUAL=cursor` are intentional (terminal vs GUI default). `VISUAL` is forced in `home.sessionVariables` so it wins over neovim `defaultEditor`.
 - SSH `HashKnownHosts` is enabled in home-manager.
 - Git signs commits with **SSH** via 1Password (`gpg.format = "ssh"` and `op-ssh-sign`), not classic GPG. Set `defaultSigningKey` in `config/user.json`. Adjust `home/git.nix` if you do not want signing.
-- **Cursor extension pins:** Cursor's VS Code engine lags upstream. **Nix IDE** and **Python Environments** are installed for Cursor via `cursor --install-extension` on home-manager activation (HM symlinks are not enough). They will not appear in marketplace search; check **Installed** or `cursor --list-extensions | grep -E 'nix-ide|python-envs'`. If missing after switch, run manually: `cursor --install-extension jnoortheen.nix-ide --force && cursor --install-extension ms-python.vscode-python-envs --force`, then reload the window.
+- **Cursor extension pins:** Cursor's VS Code engine lags upstream. **Nix IDE**, **Python Environments**, and **Pylance** are installed for Cursor via `cursor --install-extension` on home-manager activation (HM symlinks are not enough). They will not appear in marketplace search; check **Installed** or `cursor --list-extensions | grep -E 'nix-ide|python-envs|pylance'`. If missing after switch, run manually: `cursor --install-extension jnoortheen.nix-ide --force && cursor --install-extension ms-python.vscode-python-envs --force && cursor --install-extension ms-python.vscode-pylance --force`, then reload the window.
+- **Unfree extensions:** `commonBase` includes unfree marketplace packages (e.g. Git Graph). This flake sets `nixpkgs.config.allowUnfree = true`; overlays using a predicate must allow those names (and `pylance` if you reinstate VS Code HM with `pylanceVscode`).
+- **CloudFormation YAML:** Prettier is the sole YAML formatter. Prefer `Fn::` long form (`Fn::Ref`, `Fn::Sub`, …). CFN short tags (`!Ref`, `!Sub`, …) are not Prettier-safe without a dedicated CFN extension (not shipped here).
+- **Leaving VS Code:** this module no longer manages Code. After switching, remove leftover Nix-managed VS Code extensions under `~/.vscode/extensions` (and any unused Code app) if you still see old HM symlinks.

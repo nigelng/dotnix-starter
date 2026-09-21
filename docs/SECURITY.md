@@ -61,8 +61,10 @@ nix-darwin does **not** manage disk encryption or Gatekeeper assessment policy. 
 
 ## Editors
 
-- VS Code / Cursor default `security.workspace.trust.untrustedFiles` is `"prompt"`.
-- Some Cursor extensions install via `cursor --install-extension` at switch time (marketplace builds are not content-addressed like Nix store paths).
+- Cursor (and optional Devin) default `security.workspace.trust.untrustedFiles` is `"prompt"`.
+- Shared extension set is `commonBase` in `home/vscode/extensions.nix` (Cursor HM; VS Code HM disabled but reinstate-ready). Devin optionally shares the **settings** pipeline only, not extension installs.
+- `commonBase` already pulls unfree extensions (e.g. Git Graph). Keep `nixpkgs.config.allowUnfree = true` (or an `allowUnfreePredicate` that covers those names). Reinstating VS Code HM with `pylanceVscode` needs unfree as well.
+- Some Cursor extensions (nix-ide, python-envs, pylance) install via `cursor --install-extension` at switch time (marketplace builds are not content-addressed like Nix store paths).
 
 ## CI / supply chain
 

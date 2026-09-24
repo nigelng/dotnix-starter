@@ -70,7 +70,7 @@ nix-darwin does **not** manage disk encryption or Gatekeeper assessment policy. 
 
 - Workflows pin Actions by **commit SHA** (version in a comment). Dependabot still opens weekly bumps for `github-actions`.
 - `flake.yml` uses least-privilege `permissions: contents: read`.
-- Eval/fmt/check jobs set up the free public **`dotnix-starter`** Cachix cache after nix-installer. Push needs repo secret `CACHIX_AUTH_TOKEN`; without it, forks still pull from the public cache.
+- Eval/fmt/check jobs set up the free public **`dotnix-starter`** Cachix cache after nix-installer only when `CACHIX_AUTH_TOKEN` is set; otherwise the step is skipped so CI stays green without a cache.
 - Release / update-flake workflows need write permissions (or `WORKFLOW_PAT`); scope the PAT tightly and review ruleset exemptions.
 
 See also [MACOS-27.md](MACOS-27.md) for major OS upgrade guidance.

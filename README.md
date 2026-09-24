@@ -639,13 +639,13 @@ git fetch --tags
 
 ### Faster CI (Cachix)
 
-This repo uses the free public [Cachix](https://www.cachix.org) cache named **`dotnix-starter`**. `.github/workflows/flake.yml` runs `cachix/cachix-action` (SHA-pinned) after the Nix installer on eval/fmt/check jobs. Without `CACHIX_AUTH_TOKEN`, the action still **pulls** from the public cache (forks keep working); push requires the secret.
+Optional free public [Cachix](https://www.cachix.org) cache named **`dotnix-starter`**. `.github/workflows/flake.yml` runs SHA-pinned `cachix/cachix-action` after the Nix installer on eval/fmt/check jobs **only when** repo secret `CACHIX_AUTH_TOKEN` is set. Without the secret (forks, or before the cache exists), the Cachix step is skipped and CI stays green.
 
-To enable push from CI:
+To enable caching:
 
-1. Create a free OSS cache named `dotnix-starter` at [cachix.org](https://www.cachix.org) (or reuse that public cache if it already exists).
-2. Add repo secret `CACHIX_AUTH_TOKEN` (Cachix auth token with write access to that cache).
-3. Merges on `main` (and PRs with the secret available) will push store paths after builds.
+1. Create a free OSS cache named `dotnix-starter` at [cachix.org](https://www.cachix.org).
+2. Add repo secret `CACHIX_AUTH_TOKEN` (write access to that cache).
+3. Subsequent CI runs pull from and push to the cache.
 
 Do not create a private/paid cache for this template — macos overlays should reuse the same free public cache.
 

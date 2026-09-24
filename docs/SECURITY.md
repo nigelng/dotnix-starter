@@ -63,7 +63,7 @@ nix-darwin does **not** manage disk encryption or Gatekeeper assessment policy. 
 
 - Cursor (and optional Devin) default `security.workspace.trust.untrustedFiles` is `"prompt"`.
 - Shared extension set is `commonBase` in `home/vscode/extensions.nix` (Cursor HM; VS Code HM disabled but reinstate-ready). Devin optionally shares the **settings** pipeline only, not extension installs.
-- `commonBase` is free (Git Graph removed). Unfree uses `allowUnfreePredicate`: always allows `1password-cli` / `1password`; when a host's Android JSON has `"enable": true`, all unfree is allowed (Google SDK via `androidenv`). Other unfree packages stay refused on non-Android hosts. Reinstating VS Code HM with `pylanceVscode` would need an allowlist entry (or Android enable) for that package.
+- `commonBase` is free (Git Graph removed and not installed). `nixpkgs.config.allowUnfree = true` remains required for `_1password-cli`, Google Android SDK (`androidenv`), and editor/VS Code ecosystem packages that overlays or reinstated VS Code HM may pull in. Predicate allowlists proved too brittle as new unfree attrs appear.
 - Some Cursor extensions (nix-ide, python-envs, pylance) install via `cursor --install-extension` at switch time (marketplace builds are not content-addressed like Nix store paths).
 
 ## CI / supply chain

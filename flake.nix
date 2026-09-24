@@ -65,16 +65,10 @@
       pkgs = nixpkgs.legacyPackages.${system};
 
       # Same overlay as darwin/default.nix so google-fonts-* attrs resolve during validation.
-      # Overlay apps may reference unfree `_1password-cli`; Android SDK unfree stays
-      # gated per-host in darwin/default.nix when androidConfig.enable is true.
+      # allowUnfree matches darwin/default.nix so overlay apps (_1password-cli, vscode, …) eval.
       pkgsForValidation = import nixpkgs {
         inherit system;
-        config.allowUnfreePredicate =
-          pkg:
-          builtins.elem (lib.getName pkg) [
-            "1password-cli"
-            "1password"
-          ];
+        config.allowUnfree = true;
         overlays = [ (import ./overlays/google-fonts) ];
       };
 

@@ -21,7 +21,9 @@ Apple year-based releases (macOS 26 → **macOS 27**) move on a different schedu
 
 ## CI
 
-GitHub Actions currently use **`macos-14`**. When GitHub ships a runner image that matches the new Darwin (or you use a self-hosted Mac on macOS 27), update `.github/workflows/flake.yml` and `update-flake.yml`. Keep `aarch64-darwin` until Intel support is intentionally added.
+GitHub Actions currently use **`macos-14`**. When GitHub ships a runner image that matches the new Darwin (or you use a self-hosted Mac on macOS 27), update `.github/workflows/flake.yml` and `update-flake.yml`. This template is **Apple Silicon only** (`aarch64-darwin`).
+
+Nix GC on Darwin keeps generations for **14 days** (`nix.gc.options = "--delete-older-than 14d"` in `darwin/configuration.nix`).
 
 ## When Nix ships a supporting channel
 
@@ -43,6 +45,6 @@ GitHub Actions currently use **`macos-14`**. When GitHub ships a runner image th
 | After merge | `darwin-rebuild switch` (or `./build-darwin.sh`) on each Mac; watch Homebrew / PAM |
 | Channel bump | Manual `flake.nix` ref change — not automatic |
 
-Optional: Cachix for faster CI (see README). Optional follow-up: automate AMO / Cursor extension hash bumps.
+Optional: free public Cachix cache `dotnix-starter` for faster CI (see README). Optional follow-up: automate AMO / Cursor extension hash bumps.
 
 See also [SECURITY.md](SECURITY.md).

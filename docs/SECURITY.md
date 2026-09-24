@@ -13,7 +13,7 @@ nix-darwin does **not** manage disk encryption or Gatekeeper assessment policy. 
 5. **Login** — disable automatic login in System Settings if it was ever enabled (nix-darwin cannot reliably clear an existing auto-login). Guest account is disabled declaratively (`loginwindow.GuestEnabled = false`).
 6. **Lock screen** — confirm password is required immediately after sleep/screensaver (flake sets screensaver prefs; verify in System Settings if behavior drifts).
 7. **SIP / Lockdown Mode** — leave SIP enabled; enable Lockdown Mode only if your threat model needs it (per Apple Account, not via this flake).
-8. **Firmware password** — not applicable on Apple Silicon; on Intel, set only via Recovery if you still use Intel Macs.
+8. **Firmware password** — not applicable on Apple Silicon (this template targets Apple Silicon only).
 
 ## Declarative defaults (this flake)
 
@@ -33,7 +33,7 @@ nix-darwin does **not** manage disk encryption or Gatekeeper assessment policy. 
 - The macOS admin (`adminUsername`) is always a **trusted-user** (plus any names in host JSON `trustedUsers`).
 - Trusted users can add substituters / override trust boundaries without a password prompt.
 - Prefer empty `trustedUsers` and explicit `allowedUsers`. **Never** set `"*"` in either list.
-- No third-party binary caches are configured in-repo. Add substituters only when you trust the cache keys.
+- CI uses the free public **`dotnix-starter`** [Cachix](https://www.cachix.org) substituter (see README). Add other substituters only when you trust the cache keys.
 
 ## Secrets
 
@@ -63,13 +63,14 @@ nix-darwin does **not** manage disk encryption or Gatekeeper assessment policy. 
 
 - Cursor (and optional Devin) default `security.workspace.trust.untrustedFiles` is `"prompt"`.
 - Shared extension set is `commonBase` in `home/vscode/extensions.nix` (Cursor HM; VS Code HM disabled but reinstate-ready). Devin optionally shares the **settings** pipeline only, not extension installs.
-- `commonBase` already pulls unfree extensions (e.g. Git Graph). Keep `nixpkgs.config.allowUnfree = true` (or an `allowUnfreePredicate` that covers those names). Reinstating VS Code HM with `pylanceVscode` needs unfree as well.
+- `commonBase` is free (Git Graph removed). `nixpkgs.config.allowUnfree` is **Android-gated**: `true` only when that host's Android JSON has `"enable": true` (Google SDK via `androidenv`). Non-Android hosts use `allowUnfree = false`. Reinstating VS Code HM with `pylanceVscode` would need unfree for that package.
 - Some Cursor extensions (nix-ide, python-envs, pylance) install via `cursor --install-extension` at switch time (marketplace builds are not content-addressed like Nix store paths).
 
 ## CI / supply chain
 
 - Workflows pin Actions by **commit SHA** (version in a comment). Dependabot still opens weekly bumps for `github-actions`.
 - `flake.yml` uses least-privilege `permissions: contents: read`.
+- Eval/fmt/check jobs set up the free public **`dotnix-starter`** Cachix cache after nix-installer. Push needs repo secret `CACHIX_AUTH_TOKEN`; without it, forks still pull from the public cache.
 - Release / update-flake workflows need write permissions (or `WORKFLOW_PAT`); scope the PAT tightly and review ruleset exemptions.
 
 See also [MACOS-27.md](MACOS-27.md) for major OS upgrade guidance.

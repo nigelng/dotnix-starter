@@ -64,7 +64,7 @@ Uppercase `G*` shortcuts come from zimfw's `git` module (`zmodule git` in `home/
 | `config/firefox/hosts/<name>.json`     | Per-host Firefox overrides (additive merge for extensions, per-key override for settings). Required for each host in `config/hosts.json`.                                                 |
 | `config/android/base.json`             | Shared Android SDK defaults (no `enable` key). Optional for overlays that omit Android.                                                                                                   |
 | `config/android/hosts/<name>.json`     | Per-host Android opt-in (`enable`) and overrides. Required when base exists.                                                                                                              |
-| `config/schema/*.schema.json`          | JSON Schema for hosts, apps, fonts, Firefox, Android (validated by `scripts/validate-host-json.sh`)                                                                                       |
+| `config/schema/*.schema.json`          | JSON Schema for hosts, apps, fonts, Firefox, Android (validated by `scripts/validate-host-json.sh`; override with `SCHEMA_ROOT`)                                                          |
 | `config/user.json` / `config/git.json` | Shared profile (name, email, GPG) and git settings. Copy `config/user.json.example` to `config/user.json`.                                                                                |
 | `config/hosts.json`                    | Hostnames to build (`hosts`, `defaultHost`)                                                                                                                                               |
 | `config/hosts/<name>.json`             | Per-machine settings: `adminUsername`, `machineType` (`laptop` \| `macmini`), Homebrew, nix trusted/allowed users, optional `extraSessionPaths`, `knownNetworkServices`, power / SoftwareUpdate overrides |
@@ -357,7 +357,7 @@ See: `home/android.nix`, `lib/default.nix` (`loadAndroidConfig`).
 
 ## Using as a flake overlay
 
-This template exposes `homeModules` and `darwinModules` as flake outputs so a private overlay repo can import and extend them. It also exports infrastructure (`lib`, `editorTooling`, `mkWritableCopyActivation`, `darwinConfigurationsBuilder`, `overlayFlakeOutputs`, `overlays.google-fonts`, `pkgsForValidation`, `validateApps`, `scripts.validateHostJson`) so overlay repos can build `darwinConfigurations` without copying any infrastructure files.
+This template exposes `homeModules` and `darwinModules` as flake outputs so a private overlay repo can import and extend them. It also exports infrastructure (`lib`, `editorTooling`, `mkWritableCopyActivation`, `darwinConfigurationsBuilder`, `overlayFlakeOutputs`, `overlays.google-fonts`, `pkgsForValidation`, `validateApps`, `scripts.validateHostJson`, `packages.<system>.json-schemas`) so overlay repos can build `darwinConfigurations` without copying any infrastructure files.
 
 **Available exports:**
 
@@ -381,42 +381,66 @@ This template exposes `homeModules` and `darwinModules` as flake outputs so a pr
 | `darwinConfigurationsBuilder`    | The `darwin/default.nix` function — call with your own config loaders and `extraHomeModules`                                                                              |
 | `overlayFlakeOutputs`            | Shared `apps` / `checks` / `formatter` / `devShell` helper used by this flake                                                                                              |
 | `overlays.google-fonts`          | The google-fonts nixpkgs overlay                                                                                                                                          |
-| `pkgsForValidation`              | nixpkgs with google-fonts overlay for app/font validation                                                                                                                 |
+| `pkgsForValidation`              | nixpkgs with google-fonts overlay for app/font validation (`allowUnfree = false`)                                                                                         |
 | `validateApps`                   | App/font/Firefox-slug/Android JDK validation for overlay checks                                                                                                           |
 | `scripts.validateHostJson`       | Shell derivation for host JSON schema validation in CI                                                                                                                    |
+| `packages.<system>.json-schemas` | Store copy of `config/schema`; set `SCHEMA_ROOT` to this path in overlay CI instead of copying schemas                                                                    |
 
 Note: `homeModules.editor` is exported and wired to the flake-pinned `prettier-config` and `eslint-config` inputs. Overlay repos that don't provide those inputs should omit `homeModules.editor` from their imports.
 
 **Thin overlay example (recommended):**
 
-An overlay repo builds its `darwinConfigurations` using only the starter's exports + its own `config/` JSON and `home/personal.nix` — with zero copied infrastructure files:
+An overlay repo builds its `darwinConfigurations` using only the starter's exports + its own `config/` JSON and `home/personal.nix` — with zero copied infrastructure files. Prefer `follows` so darwin/HM track the starter, and `overlayFlakeOutputs` for the same `apps` / `checks` / `formatter` / `devShell` wiring:
 
 ```nix
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
-    home-manager.url = "github:nix-community/home-manager/release-26.05";
-    darwin.url = "github:LnL7/nix-darwin/nix-darwin-26.05";
-    dotnix-starter.url = "github:nigelng/dotnix-starter";
+
+    home-manager.follows = "dotnix-starter/home-manager";
+    darwin.follows = "dotnix-starter/darwin";
+
+    dotnix-starter = {
+      url = "github:nigelng/dotnix-starter"; # pin a release tag in real overlays
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, home-manager, darwin, dotnix-starter, ... }@inputs:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      home-manager,
+      darwin,
+      dotnix-starter,
+      ...
+    }:
     let
       inherit (nixpkgs) lib;
       system = "aarch64-darwin";
-      pkgs = nixpkgs.legacyPackages.${system};
-
       flakeLib = dotnix-starter.lib;
+      editorTooling = dotnix-starter.editorTooling;
       flakeRoot = builtins.toString self.outPath;
+
       manifest = flakeLib.loadHostsManifest flakeRoot;
       shared = flakeLib.loadSharedConfig flakeRoot;
-    in {
+      primaryHost = if manifest ? defaultHost then manifest.defaultHost else builtins.head manifest.hosts;
+
+      inherit (shared) gitConfig;
+
+      pkgs = nixpkgs.legacyPackages.${system};
+
       darwinConfigurations = dotnix-starter.darwinConfigurationsBuilder {
         inherit (nixpkgs) lib;
-        inherit home-manager darwin system;
-        inherit (shared) gitConfig;
-        editorTooling = dotnix-starter.editorTooling;
-        mkWritableCopyActivation = dotnix-starter.mkWritableCopyActivation;
+        inherit
+          flakeRoot
+          home-manager
+          darwin
+          system
+          gitConfig
+          editorTooling
+          ;
+        inherit (dotnix-starter) mkWritableCopyActivation;
         hosts = manifest.hosts;
         loadHostConfig = flakeLib.loadHostConfig flakeRoot;
         loadAppConfig = flakeLib.loadAppConfig flakeRoot;
@@ -427,23 +451,44 @@ An overlay repo builds its `darwinConfigurations` using only the starter's expor
         extraHomeModules = [ ./home/personal.nix ];
       };
 
-      checks.${system} =
-        assert
-          (dotnix-starter.validateApps {
-            inherit lib;
-            pkgs = dotnix-starter.pkgsForValidation;
-            hosts = manifest.hosts;
-            loadAppConfig = flakeLib.loadAppConfig flakeRoot;
-            loadFontConfig = flakeLib.loadFontConfig flakeRoot;
-            loadFirefoxConfig = flakeLib.loadFirefoxConfig flakeRoot;
-            loadAndroidConfig = flakeLib.loadAndroidConfig flakeRoot;
-          }) == { };
-        lib.genAttrs manifest.hosts (host: self.darwinConfigurations.${host}.system);
+      overlayOutputs = dotnix-starter.overlayFlakeOutputs {
+        inherit
+          self
+          pkgs
+          lib
+          system
+          dotnix-starter
+          flakeRoot
+          manifest
+          primaryHost
+          darwinConfigurations
+          editorTooling
+          ;
+        newHostApp = dotnix-starter.apps.${system}.new-host;
+      };
+    in
+    {
+      darwinConfigurations = darwinConfigurations;
+
+      formatter = overlayOutputs.formatter;
+      devShells = overlayOutputs.devShells;
+      checks = overlayOutputs.checks;
+      apps.${system} = overlayOutputs.apps.${system};
     };
 }
 ```
 
-Prefer `dotnix-starter.overlayFlakeOutputs` when you want the same `apps` / `checks` / `formatter` / `devShell` wiring as this template (see `lib/overlay-flake-outputs.nix`).
+For schema validation without copying `config/schema/`, point `SCHEMA_ROOT` at the starter package:
+
+```sh
+SCHEMA_ROOT="$(nix build --print-out-paths --no-link '.#json-schemas')" \
+  nix run github:nigelng/dotnix-starter#validate-host-json
+# or, from an overlay that wraps the starter app against its own flake root:
+# SCHEMA_ROOT="$(nix build --print-out-paths --no-link github:nigelng/dotnix-starter#json-schemas)" \
+#   nix run .#validate-host-json
+```
+
+(When the flake root *is* this template, the default `SCHEMA_ROOT=$PWD/config/schema` is enough.)
 
 **Manual overlay example (module-level):**
 
@@ -554,7 +599,7 @@ If activation stops because an existing file would be "clobbered", `home-manager
 
 ### Secrets
 
-Do not commit API tokens, private keys, or `.env` files (see `.gitignore`). Signing keys and public git metadata in `config/user.json` / `config/git.json` are fine. For encrypted repo secrets, consider [sops-nix](https://github.com/Mic92/sops-nix) or [agenix](https://github.com/ryantm/agenix). Prefer `op run` for shell secrets (see [1Password secret loading](#1password-secret-loading) and [docs/SECURITY.md](docs/SECURITY.md)).
+Do not commit API tokens, private keys, or `.env` files (see `.gitignore`). Real `config/user.json` is **local-only and gitignored** — copy from `config/user.json.example` (the example is what belongs in git). Prefer `op run` for shell secrets (see [1Password secret loading](#1password-secret-loading) and [docs/SECURITY.md](docs/SECURITY.md)). For encrypted repo secrets, consider [sops-nix](https://github.com/Mic92/sops-nix) or [agenix](https://github.com/ryantm/agenix).
 
 ### Periodic updates and macOS upgrades
 
@@ -592,9 +637,17 @@ git fetch --tags
 
 **Orphan recovery:** If a changelog header was committed but tag/release creation failed, re-dispatch with **recover: yes** (same bump type as the partial release). Use **recover: no** for all normal releases.
 
-### Faster CI (optional)
+### Faster CI (Cachix)
 
-To cache Nix store paths on GitHub Actions, add a [Cachix](https://www.cachix.org) cache and set `CACHIX_AUTH_TOKEN` in repo secrets, then extend `.github/workflows/flake.yml` with `cachix/cachix-action`.
+This repo uses the free public [Cachix](https://www.cachix.org) cache named **`dotnix-starter`**. `.github/workflows/flake.yml` runs `cachix/cachix-action` (SHA-pinned) after the Nix installer on eval/fmt/check jobs. Without `CACHIX_AUTH_TOKEN`, the action still **pulls** from the public cache (forks keep working); push requires the secret.
+
+To enable push from CI:
+
+1. Create a free OSS cache named `dotnix-starter` at [cachix.org](https://www.cachix.org) (or reuse that public cache if it already exists).
+2. Add repo secret `CACHIX_AUTH_TOKEN` (Cachix auth token with write access to that cache).
+3. Merges on `main` (and PRs with the secret available) will push store paths after builds.
+
+Do not create a private/paid cache for this template — macos overlays should reuse the same free public cache.
 
 ---
 
@@ -615,7 +668,7 @@ Linux runners cannot build this flake; CI must stay on macOS.
 
 ## Caveats
 
-- **Apple Silicon only.** The flake hardcodes `system = "aarch64-darwin"`. Intel Macs (`x86_64-darwin`) are not supported.
+- **Apple Silicon only.** The flake hardcodes `system = "aarch64-darwin"` permanently. Intel Macs (`x86_64-darwin`) are out of scope.
 - Only brews/casks listed in the merged app and font configs are installed when `homebrewCleanup` is `uninstall` or `zap`; extras are removed on switch.
 - **mas** = Mac App Store apps (IDs in `config/apps/base.json` and/or `config/apps/hosts/<host>.json`). Find existing app IDs with [mas-cli](https://github.com/mas-cli/mas).
 - [Trusted users](https://nixos.org/manual/nix/stable/command-ref/conf-file.html#conf-trusted-users) are the current user plus any listed in the host JSON. Default: `[<username>]`. Never use `"*"`.
@@ -625,6 +678,6 @@ Linux runners cannot build this flake; CI must stay on macOS.
 - SSH `HashKnownHosts` is enabled in home-manager.
 - Git signs commits with **SSH** via 1Password (`gpg.format = "ssh"` and `op-ssh-sign`), not classic GPG. Set `defaultSigningKey` in `config/user.json`. Adjust `home/git.nix` if you do not want signing.
 - **Cursor extension pins:** Cursor's VS Code engine lags upstream. **Nix IDE**, **Python Environments**, and **Pylance** are installed for Cursor via `cursor --install-extension` on home-manager activation (HM symlinks are not enough). They will not appear in marketplace search; check **Installed** or `cursor --list-extensions | grep -E 'nix-ide|python-envs|pylance'`. If missing after switch, run manually: `cursor --install-extension jnoortheen.nix-ide --force && cursor --install-extension ms-python.vscode-python-envs --force && cursor --install-extension ms-python.vscode-pylance --force`, then reload the window.
-- **Unfree extensions:** `commonBase` includes unfree marketplace packages (e.g. Git Graph). This flake sets `nixpkgs.config.allowUnfree = true`; overlays using a predicate must allow those names (and `pylance` if you reinstate VS Code HM with `pylanceVscode`).
+- **Unfree (Android-gated):** `nixpkgs.config.allowUnfree` is `true` only when that host's Android config has `"enable": true` (Google Android SDK via `androidenv`). Non-Android hosts evaluate with `allowUnfree = false`. Reinstating VS Code HM with `pylanceVscode` would need unfree again for that package.
 - **CloudFormation YAML:** Prettier is the sole YAML formatter. Prefer `Fn::` long form (`Fn::Ref`, `Fn::Sub`, …). CFN short tags (`!Ref`, `!Sub`, …) are not Prettier-safe without a dedicated CFN extension (not shipped here).
 - **Leaving VS Code:** this module no longer manages Code. After switching, remove leftover Nix-managed VS Code extensions under `~/.vscode/extensions` (and any unused Code app) if you still see old HM symlinks.

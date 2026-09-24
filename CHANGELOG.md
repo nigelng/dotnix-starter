@@ -6,17 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
 
+## [Unreleased]
+
+### Added
+
+- `packages.<system>.json-schemas` store export; `SCHEMA_ROOT` for `scripts/validate-host-json.sh`
+- Free public Cachix cache `dotnix-starter` in `flake.yml` (SHA-pinned `cachix-action`; push via `CACHIX_AUTH_TOKEN`)
+
+### Changed
+
+- Nix GC retention `--delete-older-than 14d` (was `7d`)
+- Thin-overlay README example: `follows` + `flakeRoot` + `overlayFlakeOutputs` (match real macos usage)
+- Secrets docs: real `user.json` is local-only / gitignored; example file only in git
+- Apple Silicon–only wording (no Intel backlog tone) in README / MACOS-27 / SECURITY
+- Remove Git Graph (`mhutchie.git-graph`); Android-gate `allowUnfree` (non-Android hosts `false`)
+- Lazy Android SDK composition inside `mkIf` so disabled hosts do not force unfree
+- SECURITY: document free Cachix substituter; trim Intel firmware note
+
+### Removed
+
+- `mhutchie.git-graph` from `commonBase`
+
 ## [1.0.7] - 2026-09-21
 
 ### Breaking
 
 - cursor: manage Cursor only and prune editor stack (#27)
-
-
-### Added
-
-
-## [Unreleased]
 
 ### Added
 

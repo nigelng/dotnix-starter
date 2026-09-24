@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.0.11] - 2026-09-24
+
+### Fixed
+
+- Android SDK PATH: resolve cmdline-tools via `sdk.cmdline-tools-package.path` (repo.json / eval-time) instead of `builtins.readDir` on the SDK store path, which forced IFD and broke `nix flake check --no-build` on Android-enabled hosts
+
 ## [1.0.10] - 2026-09-24
 
 ### Fixed

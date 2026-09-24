@@ -89,14 +89,14 @@ in
       androidsdk = sdk.androidsdk;
       jdk = pkgs.${cfg.jdkPackage};
       sdkRoot = "${androidsdk}/libexec/android-sdk";
-      # nixpkgs cmdline-tools layout can change across versions; pick the latest.
-      cmdlineToolsVersion = lib.last (
-        lib.sort lib.strings.compareVersions (lib.attrNames (builtins.readDir "${sdkRoot}/cmdline-tools"))
-      );
+      # Use androidenv's package path from repo.json (eval-time). Do NOT
+      # builtins.readDir the SDK store path — that is IFD and breaks
+      # `nix flake check --no-build` on Android-enabled hosts.
+      cmdlineToolsBin = "${sdkRoot}/${sdk.cmdline-tools-package.path}/bin";
       androidToolPaths = [
         "${sdkRoot}/emulator"
         "${sdkRoot}/platform-tools"
-        "${sdkRoot}/cmdline-tools/${cmdlineToolsVersion}/bin"
+        cmdlineToolsBin
       ];
     in
     {

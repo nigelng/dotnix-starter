@@ -2,6 +2,9 @@
 #
 # JSON defaults (config/android/base.json + hosts/<host>.json) seed option
 # defaults. Android is opt-in per host via "enable": true in host JSON.
+#
+# SDK composition lives inside mkIf so hosts with enable=false do not force
+# unfree androidenv packages (nixpkgs.config.allowUnfree is Android-gated).
 {
   config,
   pkgs,
@@ -11,27 +14,6 @@
 }:
 let
   cfg = config.my.android;
-
-  sdk = pkgs.androidenv.composeAndroidPackages {
-    platformVersions = cfg.platformVersions;
-    systemImageTypes = cfg.systemImageTypes;
-    abiVersions = cfg.abiVersions;
-    includeEmulator = true;
-    includeNDK = true;
-    includeSystemImages = true;
-  };
-  androidsdk = sdk.androidsdk;
-  jdk = pkgs.${cfg.jdkPackage};
-  sdkRoot = "${androidsdk}/libexec/android-sdk";
-  # nixpkgs cmdline-tools layout can change across versions; pick the latest.
-  cmdlineToolsVersion = lib.last (
-    lib.sort lib.strings.compareVersions (lib.attrNames (builtins.readDir "${sdkRoot}/cmdline-tools"))
-  );
-  androidToolPaths = [
-    "${sdkRoot}/emulator"
-    "${sdkRoot}/platform-tools"
-    "${sdkRoot}/cmdline-tools/${cmdlineToolsVersion}/bin"
-  ];
 in
 {
   options.my.android = {
@@ -94,34 +76,58 @@ in
     };
   };
 
-  config = lib.mkIf cfg.enable {
-    home.packages = [
-      androidsdk
-      jdk
-    ];
+  config = lib.mkIf cfg.enable (
+    let
+      sdk = pkgs.androidenv.composeAndroidPackages {
+        platformVersions = cfg.platformVersions;
+        systemImageTypes = cfg.systemImageTypes;
+        abiVersions = cfg.abiVersions;
+        includeEmulator = true;
+        includeNDK = true;
+        includeSystemImages = true;
+      };
+      androidsdk = sdk.androidsdk;
+      jdk = pkgs.${cfg.jdkPackage};
+      sdkRoot = "${androidsdk}/libexec/android-sdk";
+      # nixpkgs cmdline-tools layout can change across versions; pick the latest.
+      cmdlineToolsVersion = lib.last (
+        lib.sort lib.strings.compareVersions (lib.attrNames (builtins.readDir "${sdkRoot}/cmdline-tools"))
+      );
+      androidToolPaths = [
+        "${sdkRoot}/emulator"
+        "${sdkRoot}/platform-tools"
+        "${sdkRoot}/cmdline-tools/${cmdlineToolsVersion}/bin"
+      ];
+    in
+    {
+      home.packages = [
+        androidsdk
+        jdk
+      ];
 
-    home.sessionPath = androidToolPaths;
+      home.sessionPath = androidToolPaths;
 
-    home.sessionVariables = {
-      ANDROID_SDK_ROOT = sdkRoot;
-      ANDROID_HOME = sdkRoot;
-      ANDROID_AVD_HOME = cfg.avdHome;
-      JAVA_HOME = jdk.home;
-    };
+      home.sessionVariables = {
+        ANDROID_SDK_ROOT = sdkRoot;
+        ANDROID_HOME = sdkRoot;
+        ANDROID_AVD_HOME = cfg.avdHome;
+        JAVA_HOME = jdk.home;
+      };
 
-    home.file = lib.optionalAttrs cfg.guiSdkSymlink {
-      "Library/Android/sdk".source = sdkRoot;
-    };
+      home.file = lib.optionalAttrs cfg.guiSdkSymlink {
+        "Library/Android/sdk".source = sdkRoot;
+      };
 
-    home.activation.androidAvdHomeSymlink = lib.mkIf cfg.avdDefaultSymlink (
-      lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-        mkdir -p "$HOME/.android"
-        if [ -e "$HOME/.android/avd" ] && [ ! -L "$HOME/.android/avd" ]; then
-          echo "refusing to replace existing ~/.android/avd directory" >&2
-          exit 1
-        fi
-        ln -sfn "${cfg.avdHome}" "$HOME/.android/avd"
-      ''
-    );
-  };
+      home.activation.androidAvdHomeSymlink = lib.mkIf cfg.avdDefaultSymlink (
+        lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+          mkdir -p "$HOME/.android"
+          if [ -e "$HOME/.android/avd" ] && [ ! -L "$HOME/.android/avd" ]; then
+            echo "refusing to replace existing ~/.android/avd directory" >&2
+            exit 1
+          fi
+          ln -sfn "${cfg.avdHome}" "$HOME/.android/avd"
+        ''
+      );
+    }
+  );
 }

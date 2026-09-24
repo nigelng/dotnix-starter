@@ -44,7 +44,9 @@ lib.genAttrs hosts (
     };
     modules = [
       {
-        nixpkgs.config.allowUnfree = true;
+        # Unfree only when this host enables the Android SDK (google androidenv).
+        # Non-Android hosts evaluate with allowUnfree = false.
+        nixpkgs.config.allowUnfree = androidConfig.enable;
         # Plain bool: nixpkgs android builder reads this as a raw attr, not a NixOS module option.
         nixpkgs.config.android_sdk.accept_license = androidConfig.enable;
         nixpkgs.overlays = [

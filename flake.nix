@@ -65,11 +65,18 @@
       pkgs = nixpkgs.legacyPackages.${system};
 
       # Same overlay as darwin/default.nix so google-fonts-* attrs resolve during validation.
+      # Validation only checks free attrs (apps/fonts/JDK names); Android SDK unfree is
+      # gated per-host in darwin/default.nix when androidConfig.enable is true.
       pkgsForValidation = import nixpkgs {
         inherit system;
-        config.allowUnfree = true;
+        config.allowUnfree = false;
         overlays = [ (import ./overlays/google-fonts) ];
       };
+
+      jsonSchemas = pkgs.runCommand "dotnix-json-schemas" { } ''
+        mkdir -p "$out"
+        cp -r ${./config/schema}/. "$out/"
+      '';
 
       # Editor tooling is optional — only built when both flake inputs are present.
       # When absent, editorTooling is {} (empty attrset), and home/default.nix
@@ -191,6 +198,9 @@
         validateHostJson = validateHostJsonScript;
       }
       // overlayOutputs.scripts;
+
+      # Store copy of config/schema for overlay repos (set SCHEMA_ROOT to this path).
+      packages.${system}.json-schemas = jsonSchemas;
 
       # ── Module exports ─────────────────────────────────────────────────
 

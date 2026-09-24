@@ -18,7 +18,6 @@ let
       catppuccin.catppuccin-vsc
       catppuccin.catppuccin-vsc-icons
       streetsidesoftware.code-spell-checker
-      mhutchie.git-graph
       github.vscode-github-actions
       ms-python.python
       ms-python.debugpy

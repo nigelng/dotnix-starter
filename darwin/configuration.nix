@@ -49,7 +49,7 @@ in
       # Garbage collection
       automatic = true;
       interval.Day = 7;
-      options = "--delete-older-than 7d";
+      options = "--delete-older-than 14d";
     };
   };
 

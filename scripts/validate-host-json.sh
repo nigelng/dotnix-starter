@@ -1,18 +1,27 @@
 #!/usr/bin/env bash
-# Validate host/apps/fonts/firefox/android JSON against config/schema/*.schema.json.
+# Validate host/apps/fonts/firefox/android JSON against SCHEMA_ROOT/*.schema.json.
+# SCHEMA_ROOT defaults to $ROOT/config/schema (overlay repos can point at the
+# starter packages.<system>.json-schemas store path instead of copying schemas).
 # Run from the repo root, or pass the repo root as $1.
 set -euo pipefail
 
 ROOT="${1:-$PWD}"
 cd "$ROOT"
 
-host_schema="config/schema/host.schema.json"
-apps_schema="config/schema/apps.schema.json"
-fonts_schema="config/schema/fonts.schema.json"
+SCHEMA_ROOT="${SCHEMA_ROOT:-$ROOT/config/schema}"
+
+host_schema="$SCHEMA_ROOT/host.schema.json"
+apps_schema="$SCHEMA_ROOT/apps.schema.json"
+fonts_schema="$SCHEMA_ROOT/fonts.schema.json"
 manifest="config/hosts.json"
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "jq is required" >&2
+  exit 1
+fi
+
+if [[ ! -d "$SCHEMA_ROOT" ]]; then
+  echo "Missing schema directory: $SCHEMA_ROOT (set SCHEMA_ROOT or use config/schema)" >&2
   exit 1
 fi
 
@@ -86,7 +95,7 @@ validate_fonts() {
 }
 
 validate_firefox() {
-  firefox_schema="config/schema/firefox.schema.json"
+  firefox_schema="$SCHEMA_ROOT/firefox.schema.json"
   # Skip Firefox validation entirely if the base config doesn't exist
   # (overlay repos may not use Firefox).
   if [[ ! -f "config/firefox/base.json" ]]; then
@@ -105,7 +114,7 @@ validate_firefox() {
 }
 
 validate_android() {
-  android_schema="config/schema/android.schema.json"
+  android_schema="$SCHEMA_ROOT/android.schema.json"
   # Skip Android validation entirely if the base config doesn't exist
   # (overlay repos may not use Android).
   if [[ ! -f "config/android/base.json" ]]; then

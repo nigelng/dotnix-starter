@@ -44,20 +44,11 @@ lib.genAttrs hosts (
     };
     modules = [
       {
-        # Always allow 1Password packages (used on every host for CLI/SSH flows).
-        # When Android is enabled, allow all unfree (Google androidenv SDK), matching
-        # the previous allowUnfree = androidConfig.enable behavior. Other unfree
-        # (e.g. reinstated Git Graph) stays refused on non-Android hosts.
-        nixpkgs.config.allowUnfreePredicate =
-          pkg:
-          let
-            name = lib.getName pkg;
-          in
-          builtins.elem name [
-            "1password-cli"
-            "1password"
-          ]
-          || androidConfig.enable;
+        # Unfree stays on for the whole template: 1password-cli, Android SDK
+        # (androidenv), and editor/VS Code ecosystem packages overlays may pull in.
+        # Predicate allowlists keep failing as new unfree attrs appear — prefer blunt true.
+        # Git Graph remains removed from commonBase; this does not reinstall it.
+        nixpkgs.config.allowUnfree = true;
         # Plain bool: nixpkgs android builder reads this as a raw attr, not a NixOS module option.
         nixpkgs.config.android_sdk.accept_license = androidConfig.enable;
         nixpkgs.overlays = [

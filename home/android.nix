@@ -4,7 +4,7 @@
 # defaults. Android is opt-in per host via "enable": true in host JSON.
 #
 # SDK composition lives inside mkIf so hosts with enable=false do not force
-# unfree androidenv packages (nixpkgs.config.allowUnfree is Android-gated).
+# unfree androidenv packages (nixpkgs.config.allowUnfree = true in darwin/default.nix).
 {
   config,
   pkgs,

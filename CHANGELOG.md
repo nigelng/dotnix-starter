@@ -8,6 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.0.10] - 2026-09-24
+
+### Fixed
+
+- Restore `nixpkgs.config.allowUnfree = true` (darwin + `pkgsForValidation`); drop fragile `allowUnfreePredicate` / Android-only gate that still failed overlay eval on unfree `vscode` and similar attrs
+
+### Changed
+
+- Docs (SECURITY / README): unfree remains required for 1password-cli, Android SDK, and editor/VS Code ecosystem; Git Graph stays removed / not installed
+
+## [1.0.9] - 2026-09-24
+
 ### Fixed
 
 - Always allow unfree `1password-cli` / `1password` via `allowUnfreePredicate` (every host / overlay SSH/`op` flows); keep Android SDK unfree when that host enables Android; refuse other unfree on non-Android hosts

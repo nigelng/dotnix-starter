@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Always allow unfree `1password-cli` / `1password` via `allowUnfreePredicate` (every host / overlay SSH/`op` flows); keep Android SDK unfree when that host enables Android; refuse other unfree on non-Android hosts
+
+### Changed
+
+- Docs (SECURITY / README): editors free; unfree allowlist is 1password-cli (+ Android when enabled)
+
+## [1.0.8] - 2026-09-24
+
 ### Added
 
 - `packages.<system>.json-schemas` store export; `SCHEMA_ROOT` for `scripts/validate-host-json.sh`

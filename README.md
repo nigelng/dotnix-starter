@@ -639,7 +639,7 @@ git fetch --tags
 
 ### Faster CI (Cachix)
 
-Optional free public [Cachix](https://www.cachix.org) cache named **`dotnix-starter`**. `.github/workflows/flake.yml` runs SHA-pinned `cachix/cachix-action` after the Nix installer on eval/fmt/check jobs **only when** repo secret `CACHIX_AUTH_TOKEN` is set. Without the secret (forks, or before the cache exists), the Cachix step is skipped and CI stays green.
+Optional free public [Cachix](https://www.cachix.org) cache named **`dotnix-starter`**. `.github/workflows/flake.yml` runs SHA-pinned `cachix/cachix-action` after the Nix installer on eval/fmt/check jobs (`authToken` from `CACHIX_AUTH_TOKEN`). Until the public cache and secret exist, the Cachix step may show as failed — it uses `continue-on-error: true`, so fmt/eval/check still run and the job can pass.
 
 To enable caching:
 

@@ -11,7 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - `packages.<system>.json-schemas` store export; `SCHEMA_ROOT` for `scripts/validate-host-json.sh`
-- Free public Cachix cache `dotnix-starter` in `flake.yml` (SHA-pinned `cachix-action`; skipped unless `CACHIX_AUTH_TOKEN` is set)
+- Free public Cachix cache `dotnix-starter` in `flake.yml` (SHA-pinned `cachix-action`; `continue-on-error` until cache + `CACHIX_AUTH_TOKEN` exist)
 
 ### Changed
 

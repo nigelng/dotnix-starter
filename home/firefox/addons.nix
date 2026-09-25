@@ -44,6 +44,13 @@ let
       url = "https://addons.mozilla.org/firefox/downloads/file/4805625/adguard_adblocker-5.4.3.1.xpi";
       hash = "sha256-NKAzwTSD1Pif/0RP67xMNNdCqcUR6vscfthcwBhGF+c";
     };
+    # Companion for AdGuard desktop app (replaces standalone AdBlocker when the app is installed).
+    "adguard-browser-assistant" = {
+      name = "adguard-browser-assistant";
+      addonId = "browserassistant@adguard.com";
+      url = "https://addons.mozilla.org/firefox/downloads/file/4549017/adguard_browser_assistant-1.4.8.xpi";
+      hash = "sha256-CRIjaZvgQKhLPHuL838bIeD4fnX9+jgKW0V2LB2sfVE=";
+    };
     "privacy-badger17" = {
       name = "privacy-badger17";
       addonId = "jid1-MnnxcxisBPnSXQ@jetpack";

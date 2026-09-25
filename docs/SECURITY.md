@@ -54,6 +54,7 @@ nix-darwin does **not** manage disk encryption or Gatekeeper assessment policy. 
 
 - The Firefox **app** comes from the Homebrew `firefox` cask only. home-manager never installs Firefox from nixpkgs (`programs.firefox.package = null` always).
 - Default add-ons use enterprise `ExtensionSettings` (`force_installed`) with **pinned** AMO file URLs from `home/firefox/addons.nix` / `extensions.manual`. Firefox fetches Mozilla-signed XPIs at first launch or after policy apply (HTTPS + AMO + Mozilla signing).
+- The curated catalog may include optional AMO slugs beyond the default `extensions.nix` set (e.g. `adguard-browser-assistant` for AdGuard desktop users). Same pin/bump rules apply; overlays opt in via JSON slugs — do not ship conflicting AdGuard AdBlocker + Browser Assistant together.
 - **Trust gap vs Nix store:** policy install does **not** verify sha256 at `nix switch`. Mitigations: pin file URLs in git, keep `extensions.update.enabled` / `autoUpdateDefault` false, bump catalog/manual URLs intentionally for CVE fixes.
 - Do **not** duplicate starter `addonId`s in overlay `ExtensionSettings` — starter owns the force-installed list from JSON; overlays should use `extensions.nix` slugs or `manual` entries.
 - `extensions.manual` accepts arbitrary URL + hash — treat host JSON as trusted input (a malicious URL compromises the profile).

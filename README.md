@@ -256,6 +256,12 @@ See: `home/zsh.nix`, [docs/SECURITY.md](docs/SECURITY.md).
 | AdGuard AdBlocker | `adguard-adblocker`              | Ad/tracker blocking     |
 | Privacy Badger    | `privacy-badger17`               | Tracker blocking        |
 
+**Also in the curated catalog** (`home/firefox/addons.nix`; not in default `extensions.nix` — overlays may opt in via JSON slugs):
+
+| Add-on                    | AMO slug                     | Purpose                                                              |
+| ------------------------- | ---------------------------- | -------------------------------------------------------------------- |
+| AdGuard Browser Assistant | `adguard-browser-assistant`  | Companion for the AdGuard desktop app (use instead of AdBlocker then) |
+
 **Privacy/telemetry settings (in `config/firefox/base.json`):**
 
 | Category            | Key prefs                                                                                             | Effect                                                                                            |

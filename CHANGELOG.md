@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
 
+## [1.0.12] - 2026-09-25
+
+### Breaking
+
+- user-config: fail closed when config/user.json is missing (#34)
+
+
+### Changed
+
+- update flake inputs (#29)
+
+
+### Fixed
+
+
+
+
 ## [Unreleased]
 
 ### Changed

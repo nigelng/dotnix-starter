@@ -123,7 +123,7 @@
         loadFontConfig = flakeLib.loadFontConfig flakeRoot;
         loadFirefoxConfig = flakeLib.loadFirefoxConfig flakeRoot;
         loadAndroidConfig = flakeLib.loadAndroidConfig flakeRoot;
-        loadUserConfig = flakeLib.loadUserConfig flakeRoot;
+        loadUserConfig = flakeLib.loadUserConfig flakeRoot { allowExample = true; };
       };
 
       newHostApp = pkgs.writeShellApplication {

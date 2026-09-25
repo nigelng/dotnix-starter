@@ -65,7 +65,7 @@ Uppercase `G*` shortcuts come from zimfw's `git` module (`zmodule git` in `home/
 | `config/android/base.json`             | Shared Android SDK defaults (no `enable` key). Optional for overlays that omit Android.                                                                                                   |
 | `config/android/hosts/<name>.json`     | Per-host Android opt-in (`enable`) and overrides. Required when base exists.                                                                                                              |
 | `config/schema/*.schema.json`          | JSON Schema for hosts, apps, fonts, Firefox, Android (validated by `scripts/validate-host-json.sh`; override with `SCHEMA_ROOT`)                                                          |
-| `config/user.json` / `config/git.json` | Shared profile (name, email, GPG) and git settings. Copy `config/user.json.example` to `config/user.json`.                                                                                |
+| `config/user.json` / `config/git.json` | Shared profile (name, email, GPG) and git settings. Copy `config/user.json.example` to `config/user.json`, edit, and **git add** it (flakes only see tracked files). |
 | `config/hosts.json`                    | Hostnames to build (`hosts`, `defaultHost`)                                                                                                                                               |
 | `config/hosts/<name>.json`             | Per-machine settings: `adminUsername`, `machineType` (`laptop` \| `macmini`), Homebrew, nix trusted/allowed users, optional `extraSessionPaths`, `knownNetworkServices`, power / SoftwareUpdate overrides |
 | `docs/MACOS-27.md`                     | Major macOS / channel upgrade checklist                                                                                                                                                   |
@@ -112,6 +112,7 @@ Uppercase `G*` shortcuts come from zimfw's `git` module (`zmodule git` in `home/
    ```sh
    cp config/user.json.example config/user.json
    # Edit config/user.json: name, email, GPG key, signing key
+   git add config/user.json   # flakes only see tracked files
    ```
 
 5. Edit `config/hosts/example-mac.json` with your macOS username and machine settings.
@@ -447,7 +448,7 @@ An overlay repo builds its `darwinConfigurations` using only the starter's expor
         loadFontConfig = flakeLib.loadFontConfig flakeRoot;
         loadFirefoxConfig = flakeLib.loadFirefoxConfig flakeRoot;
         loadAndroidConfig = flakeLib.loadAndroidConfig flakeRoot;
-        loadUserConfig = flakeLib.loadUserConfig flakeRoot;
+        loadUserConfig = flakeLib.loadUserConfig flakeRoot { };
         extraHomeModules = [ ./home/personal.nix ];
       };
 
@@ -599,7 +600,7 @@ If activation stops because an existing file would be "clobbered", `home-manager
 
 ### Secrets
 
-Do not commit API tokens, private keys, or `.env` files (see `.gitignore`). Real `config/user.json` is **local-only and gitignored** — copy from `config/user.json.example` (the example is what belongs in git). Prefer `op run` for shell secrets (see [1Password secret loading](#1password-secret-loading) and [docs/SECURITY.md](docs/SECURITY.md)). For encrypted repo secrets, consider [sops-nix](https://github.com/Mic92/sops-nix) or [agenix](https://github.com/ryantm/agenix).
+Do not commit API tokens, private keys, or `.env` files (see `.gitignore`). Track `config/user.json` in git — it holds public identity (name, email, GPG key id, SSH **public** signing key), not private key material. Copy from `config/user.json.example`, edit, and `git add` it; overlays fail closed if it is missing from the flake store copy. Prefer `op run --env-file=.env` for shell secrets (see [1Password secret loading](#1password-secret-loading) and [docs/SECURITY.md](docs/SECURITY.md)); do not put 1Password item ids in Nix. For encrypted repo secrets, consider [sops-nix](https://github.com/Mic92/sops-nix) or [agenix](https://github.com/ryantm/agenix).
 
 ### Periodic updates and macOS upgrades
 

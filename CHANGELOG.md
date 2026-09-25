@@ -8,6 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- `loadUserConfig` is now `root: { allowExample ? false }: hostName:` — overlays must call `loadUserConfig flakeRoot { }` (fail closed when `config/user.json` is missing). The starter passes `allowExample = true` for CI.
+- Track `config/user.json` in git as public identity (name, email, key ids / public signing key). Remove it from `.gitignore`. Prefer `op run --env-file=.env` for tokens; do not put 1Password item ids in Nix.
+
+### Fixed
+
+- Missing gitignored `config/user.json` no longer silently ships placeholder `"Your Name"` git/gpg identity into overlays; missing file throws unless `allowExample = true`.
+
 ## [1.0.11] - 2026-09-24
 
 ### Fixed

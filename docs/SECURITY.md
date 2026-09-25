@@ -37,9 +37,10 @@ nix-darwin does **not** manage disk encryption or Gatekeeper assessment policy. 
 
 ## Secrets
 
-- `config/user.json` is gitignored; copy from `config/user.json.example`.
+- Track `config/user.json` in git (name, email, GPG key id, SSH public signing key). Copy from `config/user.json.example`, edit, and `git add` — flakes only see tracked files. Overlays fail closed if it is missing; the starter may pass `allowExample = true` for CI.
+- Do not put API tokens, private keys, or 1Password item ids in Nix or in `user.json`.
 - SSH uses the 1Password agent; git commit signing uses SSH via `op-ssh-sign` (`gpg.format = "ssh"`), not a private key in the repo.
-- Prefer short-lived injection with `op run` over exporting tokens into the shell environment.
+- Prefer short-lived injection with `op run --env-file=.env` over exporting tokens into the shell environment.
 - The commented `load_secret` alias in `home/zsh.nix` puts secrets in process environment if enabled — avoid for long-lived tokens.
 - Install `_1password-cli` via apps JSON if you use `op` on the CLI.
 

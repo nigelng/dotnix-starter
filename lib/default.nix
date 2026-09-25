@@ -10,22 +10,30 @@ let
 
   loadRawHostConfig = root: hostName: loadJson "${root}/config/hosts/${hostName}.json";
 
+  # loadUserConfig root { allowExample ? false } hostName
+  # Overlays must pass {} (fail closed). The starter passes allowExample = true for CI.
   loadUserConfig =
-    root: hostName:
+    root:
+    {
+      allowExample ? false,
+    }:
+    hostName:
     let
       userPath = "${root}/config/user.json";
       examplePath = "${root}/config/user.json.example";
       profile =
         if builtins.pathExists userPath then
           loadJson userPath
-        else if builtins.pathExists examplePath then
+        else if allowExample && builtins.pathExists examplePath then
           builtins.trace "loadUserConfig: ${userPath} not found — using placeholder values from ${examplePath}." (
             loadJson examplePath
           )
         else
           builtins.throw ''
-            loadUserConfig: neither ${userPath} nor ${examplePath} found.
-            Copy config/user.json.example to config/user.json and edit with your details.
+            loadUserConfig: ${userPath} not found.
+            Flakes only see git-tracked files (self.outPath). Copy config/user.json.example
+            to config/user.json, edit your identity fields, then git add config/user.json.
+            Do not gitignore it — that silently excluded the file from eval.
           '';
       host = loadRawHostConfig root hostName;
     in

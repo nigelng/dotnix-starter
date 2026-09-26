@@ -27,15 +27,6 @@ in
     git = gitConfig // {
       enable = true;
 
-      delta = {
-        enable = true;
-        options = {
-          navigate = true;
-          line-numbers = true;
-          features = theme.deltaFeatures;
-        };
-      };
-
       includes = [
         {
           path = ./themes/delta-catppuccin.gitconfig;
@@ -83,6 +74,17 @@ in
           ui = true;
           status = "always";
         };
+      };
+    };
+
+    # Top-level module (HM renamed away from programs.git.delta).
+    delta = {
+      enable = true;
+      enableGitIntegration = true;
+      options = {
+        navigate = true;
+        line-numbers = true;
+        features = theme.deltaFeatures;
       };
     };
   };

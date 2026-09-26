@@ -36,8 +36,23 @@ in
 
   programs = {
     home-manager.enable = true;
-    dircolors.enable = true;
+    # LS_COLORS come from vivid (Catppuccin Mocha) in home/zsh.nix — not dircolors.
+    dircolors.enable = false;
     man.enable = true;
+
+    bat = {
+      enable = true;
+      config.theme = theme.batTheme;
+      themes.${theme.batTheme} = {
+        src = pkgs.fetchFromGitHub {
+          owner = "catppuccin";
+          repo = "bat";
+          rev = "6810349b28055dce54076712fc05fc68da4b8ec0";
+          hash = "sha256-lJapSgRVENTrbmpVyn+UQabC9fpV1G1e+CdlJ090uvg=";
+        };
+        file = "themes/Catppuccin Mocha.tmTheme";
+      };
+    };
 
     btop = {
       enable = true;
@@ -122,6 +137,13 @@ in
 
     file.".config/btop/themes/catppuccin_mocha.theme".source = ./themes/btop_catppuccin_mocha;
 
+    file.".config/eza/theme.yml".source =
+      ./themes + "/eza_catppuccin_mocha_${theme.catppuccinAccent}.yml";
+
+    file.".config/gh-dash/config.yml".source = lib.mkDefault (
+      ./themes + "/gh-dash_catppuccin_mocha_${theme.catppuccinAccent}.yml"
+    );
+
     # Ghostty: Nix defaults + optional user-editable local.conf (see ghostty_local.conf.example).
     file.".config/ghostty/config".text = ''
       config-file = ${config.xdg.configHome}/ghostty/config.d/nix.conf
@@ -139,6 +161,7 @@ in
     sessionPath = systemConfig.extraSessionPaths;
     packages =
       userApps
+      ++ [ pkgs.vivid ]
       ++ lib.optionals (lib.elem "podman" appConfig.system) [
         (pkgs.writeShellScriptBin "docker" ''exec podman "$@"'')
         (pkgs.writeShellScriptBin "docker-compose" ''exec podman-compose "$@"'')

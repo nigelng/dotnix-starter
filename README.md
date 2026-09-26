@@ -573,6 +573,7 @@ Optional keys in `config/hosts/<name>.json`:
 | `automaticallyInstallMacOSUpdates` | `true` | Set `false` before major macOS betas ([docs/MACOS-27.md](docs/MACOS-27.md)) |
 | `knownNetworkServices` | From preset | Override interface display names |
 | `extraSessionPaths` | `[]` | Extra PATH entries for the user session |
+| `claudeKit` | `false` | Enables the Claude/Cursor MCP + skills kit; starter ships the flag only — behavior lives in an overlay module |
 
 ### `machineType` (host presets)
 

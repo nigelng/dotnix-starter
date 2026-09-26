@@ -4,7 +4,13 @@
   vscodeTheme = "Catppuccin Mocha";
   iconTheme = "catppuccin-mocha";
   btopTheme = "catppuccin_mocha";
+  nvimColorscheme = "catppuccin_mocha";
   ghosttyTheme = "dark:Catppuccin Mocha,light:Catppuccin Latte";
+  batTheme = "Catppuccin Mocha";
+  deltaFeatures = "catppuccin-mocha";
+  vividTheme = "catppuccin-mocha";
+  # Selects vendored eza/gh-dash files: themes/*_catppuccin_mocha_<accent>.yml
+  catppuccinAccent = "mauve";
   fzfColors = {
     "bg+" = "#313244";
     bg = "#1e1e2e";

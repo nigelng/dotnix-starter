@@ -13,6 +13,7 @@ This template is designed to work standalone **and** as a flake overlay — a pr
 - **Ghostty config** — Nix defaults from `home/themes/default.nix` into `~/.config/ghostty/config.d/nix.conf`; personal overrides in `~/.config/ghostty/local.conf`. Install the Ghostty app yourself (e.g. add a Homebrew cask in apps JSON)
 - **[Firefox](https://www.mozilla.org/firefox/)** — backup browser via Homebrew cask with Dark Reader, 1Password, AdGuard AdBlocker, and Privacy Badger; privacy-hardened HM profile defaults; JSON-driven config in `config/firefox/` (see [Firefox (backup browser)](#firefox-backup-browser))
 - **btop** with Catppuccin Mocha theme
+- **Themed CLI tools** — Catppuccin Mocha (mauve accent): p10k palette, eza, vivid `LS_COLORS`, gh-dash, bat, git delta
 
 **User-scope extras** (home-manager):
 

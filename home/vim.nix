@@ -1,4 +1,7 @@
 { pkgs, ... }:
+let
+  theme = import ./themes/default.nix;
+in
 {
 
   programs.neovim = {
@@ -7,6 +10,11 @@
     vimdiffAlias = true;
     withNodeJs = true;
     defaultEditor = true;
+
+    extraConfig = ''
+      set termguicolors
+      colorscheme ${theme.nvimColorscheme}
+    '';
 
     plugins = with pkgs.vimPlugins; [
       catppuccin-vim

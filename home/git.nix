@@ -4,6 +4,9 @@
   userConfig,
   ...
 }:
+let
+  theme = import ./themes/default.nix;
+in
 {
   programs = {
     gh = {
@@ -23,6 +26,21 @@
 
     git = gitConfig // {
       enable = true;
+
+      delta = {
+        enable = true;
+        options = {
+          navigate = true;
+          line-numbers = true;
+          features = theme.deltaFeatures;
+        };
+      };
+
+      includes = [
+        {
+          path = ./themes/delta-catppuccin.gitconfig;
+        }
+      ];
 
       lfs = {
         enable = true;

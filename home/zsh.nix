@@ -7,6 +7,14 @@
   mkWritableCopyActivation,
   ...
 }:
+let
+  theme = import ./themes/default.nix;
+
+  # Bake LS_COLORS at build time so interactive shells do not spawn vivid.
+  vividLsColors = pkgs.runCommand "vivid-ls-colors-${theme.vividTheme}" { } ''
+    ${pkgs.vivid}/bin/vivid generate ${lib.escapeShellArg theme.vividTheme} > "$out"
+  '';
+in
 {
   home.packages = [
     pkgs.zimfw
@@ -140,6 +148,10 @@
           fi
         '')
       )
+      # After any other hooks so stock dircolors (if re-enabled) cannot clobber Mocha LS_COLORS.
+      (lib.mkAfter ''
+        export LS_COLORS="$(<${vividLsColors})"
+      '')
     ];
 
     profileExtra = ''

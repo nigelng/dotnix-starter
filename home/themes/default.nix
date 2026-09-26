@@ -1,6 +1,6 @@
 # Display names and palette constants (font installation stays in config/fonts/).
 {
-  uiFont = "MesloLGMDZ Nerd Font Mono";
+  uiFont = "JetBrainsMono Nerd Font Mono";
   vscodeTheme = "Catppuccin Mocha";
   iconTheme = "catppuccin-mocha";
   btopTheme = "catppuccin_mocha";

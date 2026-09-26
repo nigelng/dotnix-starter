@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
 
+## [Unreleased]
+
+### Changed
+
+- fonts: default `uiFont` to JetBrainsMono Nerd Font Mono; install `jetbrains-mono` instead of `meslo-lg`
+
+
 ## [1.0.13] - 2026-09-25
 
 

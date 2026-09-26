@@ -9,7 +9,7 @@ This template is designed to work standalone **and** as a flake overlay — a pr
 **Included:**
 
 - **zsh** as the login shell
-- **Fonts**: `config/fonts/base.json` defines `pkgs` (nixpkgs-only), `google` (via `overlays/google-fonts`), and `nerd` (starter ships `meslo-lg`); per-host extras (including optional Homebrew font `casks`) in `config/fonts/hosts/<hostname>.json`
+- **Fonts**: `config/fonts/base.json` defines `pkgs` (nixpkgs-only), `google` (via `overlays/google-fonts`), and `nerd` (starter ships `jetbrains-mono`; UI font `JetBrainsMono Nerd Font Mono`); per-host extras (including optional Homebrew font `casks`) in `config/fonts/hosts/<hostname>.json`
 - **Ghostty config** — Nix defaults from `home/themes/default.nix` into `~/.config/ghostty/config.d/nix.conf`; personal overrides in `~/.config/ghostty/local.conf`. Install the Ghostty app yourself (e.g. add a Homebrew cask in apps JSON)
 - **[Firefox](https://www.mozilla.org/firefox/)** — backup browser via Homebrew cask with Dark Reader, 1Password, AdGuard AdBlocker, and Privacy Badger; privacy-hardened HM profile defaults; JSON-driven config in `config/firefox/` (see [Firefox (backup browser)](#firefox-backup-browser))
 - **btop** with Catppuccin Mocha theme

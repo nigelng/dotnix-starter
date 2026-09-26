@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
 
+## [1.0.16] - 2026-09-26
+
+
+### Added
+
+- host: add claudeKit schema flag (#42)
+
+
+### Fixed
+
+- git: migrate delta to programs.delta (#41)
+
+
+
+
 ## [1.0.15] - 2026-09-26
 
 

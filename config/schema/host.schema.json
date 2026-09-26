@@ -56,6 +56,10 @@
     "automaticallyInstallMacOSUpdates": {
       "type": "boolean",
       "description": "Defaults to true. Set false before major macOS betas until nix-darwin supports the new OS."
+    },
+    "claudeKit": {
+      "type": "boolean",
+      "description": "Defaults to false. Enables the Claude/Cursor MCP + skills kit (overlay-provided module); starter itself ships no kit behavior."
     }
   }
 }

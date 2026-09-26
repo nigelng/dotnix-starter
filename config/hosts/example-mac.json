@@ -8,5 +8,6 @@
   "homebrewPrefix": "/opt/homebrew",
   "homebrewCleanup": "check",
   "trustedUsers": [],
-  "allowedUsers": ["youruser"]
+  "allowedUsers": ["youruser"],
+  "claudeKit": false
 }

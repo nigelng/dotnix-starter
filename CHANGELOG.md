@@ -18,6 +18,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- host: optional `claudeKit` boolean in `config/hosts/<host>.json` (defaults to `false`); flag only — overlay repos provide the kit behavior
+
 ### Changed
 
 - git: use `programs.delta` (+ `enableGitIntegration`) instead of deprecated `programs.git.delta`

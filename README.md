@@ -386,7 +386,7 @@ This template exposes `homeModules` and `darwinModules` as flake outputs so a pr
 | `lib`                            | Config loaders (`loadHostsManifest`, `loadSharedConfig`, `loadUserConfig`, `loadAppConfig`, `loadHostConfig`, `loadRawHostConfig`, `loadFontConfig`, `loadFirefoxConfig`, `loadAndroidConfig`) |
 | `editorTooling`                  | Built editor tooling attrset, or `{}` when inputs are absent                                                                                                              |
 | `mkWritableCopyActivation`       | Helper for writable-copy activation scripts (pass into `darwinConfigurationsBuilder`)                                                                                     |
-| `darwinConfigurationsBuilder`    | The `darwin/default.nix` function — call with your own config loaders and `extraHomeModules`                                                                              |
+| `darwinConfigurationsBuilder`    | The `darwin/default.nix` function — call with your own config loaders, `extraHomeModules`, and `extraDarwinModules` (extra nix-darwin modules spliced into every host's `modules`; default `[ ]`) |
 | `overlayFlakeOutputs`            | Shared `apps` / `checks` / `formatter` / `devShell` helper used by this flake                                                                                              |
 | `overlays.google-fonts`          | The google-fonts nixpkgs overlay                                                                                                                                          |
 | `pkgsForValidation`              | nixpkgs with google-fonts overlay for app/font validation (`allowUnfree = true`, matching darwin)                                                                         |
@@ -457,6 +457,7 @@ An overlay repo builds its `darwinConfigurations` using only the starter's expor
         loadAndroidConfig = flakeLib.loadAndroidConfig flakeRoot;
         loadUserConfig = flakeLib.loadUserConfig flakeRoot { };
         extraHomeModules = [ ./home/personal.nix ];
+        # extraDarwinModules = [ ./darwin/my-module.nix ]; # optional, default [ ]
       };
 
       overlayOutputs = dotnix-starter.overlayFlakeOutputs {

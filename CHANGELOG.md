@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
 
+## [1.0.17] - 2026-09-27
+
+
+### Added
+
+- darwin: add extraDarwinModules splice point (#44)
+
+
+
+
 ## [1.0.16] - 2026-09-26
 
 

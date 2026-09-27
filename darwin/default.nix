@@ -16,6 +16,7 @@
   editorTooling,
   mkWritableCopyActivation,
   extraHomeModules ? [ ],
+  extraDarwinModules ? [ ],
   ...
 }:
 
@@ -98,6 +99,7 @@ lib.genAttrs hosts (
           my.android.enable = lib.mkDefault androidConfig.enable;
         };
       }
-    ];
+    ]
+    ++ extraDarwinModules;
   }
 )

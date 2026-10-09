@@ -3,7 +3,8 @@ repos:
     hooks:
       - id: nix-fmt
         name: nix fmt
-        entry: bash -c 'git ls-files -z "*.nix" | xargs -0 nix fmt && git ls-files -z "*.nix" | xargs -0 nix fmt -- --check'
+        # flake formatter is pkgs.nixfmt-tree (treefmt); format then verify with --ci
+        entry: bash -c 'nix fmt && nix fmt -- --ci'
         language: system
         pass_filenames: false
         files: \.nix$

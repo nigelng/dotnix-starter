@@ -35,6 +35,7 @@ let
     "terminal.integrated.defaultLocation"
   ];
 
+  # Editors/nil format a single buffer via the nixfmt binary; flake `nix fmt` uses nixfmt-tree.
   nixToolPaths = {
     nix.serverPath = "${pkgs.nil}/bin/nil";
     nix.formatterPath = "${pkgs.nixfmt}/bin/nixfmt";

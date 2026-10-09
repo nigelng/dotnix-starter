@@ -81,7 +81,8 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Check Nix formatting
-        run: git ls-files -z '*.nix' | xargs -0 nix fmt -- --check
+        # flake formatter is pkgs.nixfmt-tree (treefmt); --ci is the supported check mode
+        run: nix fmt -- --ci
 
   shellcheck:
     runs-on: ubuntu-latest

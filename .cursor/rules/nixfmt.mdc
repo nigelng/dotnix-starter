@@ -7,7 +7,7 @@ alwaysApply: true
 
 # nixfmt required
 
-This repository's CI runs `nix fmt -- --check` on every tracked `*.nix` file (`Flake check / fmt`). Unformatted Nix fails the PR.
+This repository’s flake `formatter` is `pkgs.nixfmt-tree` (treefmt wrapping official `nixfmt`). CI runs `nix fmt -- --ci` (`Flake check / fmt`). Unformatted Nix fails the PR.
 
 ## Required before every commit that touches Nix
 
@@ -15,20 +15,19 @@ This repository's CI runs `nix fmt -- --check` on every tracked `*.nix` file (`F
 
    ```sh
    nix fmt
-   # or only changed files:
-   git ls-files -z '*.nix' | xargs -0 nix fmt
    ```
 
-2. Confirm clean:
+2. Confirm clean (same check as CI):
 
    ```sh
-   git ls-files -z '*.nix' | xargs -0 nix fmt -- --check
+   nix fmt -- --ci
    ```
 
 3. Do **not** commit or push Nix changes until the check passes.
 
 ## Notes
 
-- Prefer `nix fmt` from the repo flake (matches CI), not a random global `nixfmt` version, when possible.
-- Optional local hook: `pre-commit install` (see `.pre-commit-config.yaml`) formats/checks on commit.
+- Prefer bare `nix fmt` from the repo flake (matches CI). That path avoids nixfmt 1.x’s deprecated directory recursion.
+- Optional local hook: `pre-commit install` (see `.pre-commit-config.yaml`) formats then runs `--ci` on commit.
+- Editors should keep calling the `nixfmt` binary for a single buffer; flake format uses `nixfmt-tree`.
 - Applies to cloud and local Cursor agents alike — treat this as a hard gate, not a nice-to-have.

@@ -178,8 +178,8 @@ darwin-rebuild switch --flake .
 
 ```sh
 nix develop          # shell with nixfmt, jq, shellcheck, nodejs, jsonschema (host JSON validation)
-nix fmt              # format *.nix (uses flake formatter)
-nix fmt $(git ls-files '*.nix') -- --check   # verify formatting (CI uses this)
+nix fmt              # format *.nix (flake formatter = nixfmt-tree / treefmt)
+nix fmt -- --ci      # verify formatting (CI uses this; treefmt CI mode)
 nix run '.#check'    # runs nix flake check (may warn once if repo is dirty)
 nix flake check      # direct; use after committing for quiet output
 nix flake update     # bump input pins (commit flake.lock when intentional)
@@ -624,7 +624,7 @@ pre-commit install
 pre-commit run --all-files
 ```
 
-Hooks (see `.pre-commit-config.yaml`): **`nix fmt`** (writes, then `--check`) on `*.nix`, `shellcheck` on `scripts/*.sh` and `build-darwin.sh`. Agents must also run `nix fmt` before committing Nix (see [AGENTS.md](AGENTS.md) and `.cursor/rules/nixfmt.mdc`). Not required for CI beyond the flake `fmt` job.
+Hooks (see `.pre-commit-config.yaml`): **`nix fmt`** (writes, then `nix fmt -- --ci`) on `*.nix`, `shellcheck` on `scripts/*.sh` and `build-darwin.sh`. Agents must also run `nix fmt` before committing Nix (see [AGENTS.md](AGENTS.md) and `.cursor/rules/nixfmt.mdc`). Not required for CI beyond the flake `fmt` job.
 
 ### Releasing
 
@@ -666,7 +666,7 @@ Do not create a private/paid cache for this template — macos overlays should r
 GitHub Actions on `macos-14` (Apple Silicon; update the runner image when validating newer macOS — see [docs/MACOS-27.md](docs/MACOS-27.md)):
 
 - **Evaluate flake** — verifies every host in `config/hosts.json` has matching JSON under `config/hosts/`, `config/apps/hosts/`, `config/fonts/hosts/`, and (when present) Firefox/Android hosts; validates against `config/schema/*.schema.json`; then `nix flake check --no-build` (includes app/font package name and Firefox slug validation).
-- **Nix formatting** — dedicated job: `nix fmt -- --check` on all tracked `*.nix` files.
+- **Nix formatting** — dedicated job: `nix fmt -- --ci` (flake formatter is `pkgs.nixfmt-tree` / treefmt).
 - **Per-host build** (`.github/workflows/flake.yml`) — matrix derived from `config/hosts.json`: builds `.#checks.aarch64-darwin.<host>`.
 - **shellcheck** — `scripts/*.sh` and `build-darwin.sh` on Ubuntu.
 - **Update flake inputs** (`.github/workflows/update-flake.yml`) — weekly (and manual) `nix flake update` with eval check and an automated PR; full host builds run on the PR via `flake.yml`.

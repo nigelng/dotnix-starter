@@ -4,14 +4,18 @@ Instructions for Cursor and other coding agents working in this repo.
 
 ## nixfmt (required)
 
-Always run the flake Nix formatter before committing any `*.nix` changes:
+The flake `formatter` is `pkgs.nixfmt-tree` (treefmt + nixfmt). Prefer bare `nix fmt` at the flake root — it formats tracked `*.nix` without nixfmt’s deprecated directory-recursion warning.
+
+Always format before committing any `*.nix` changes:
 
 ```sh
 nix fmt
-git ls-files -z '*.nix' | xargs -0 nix fmt -- --check
+nix fmt -- --ci
 ```
 
-CI job `Flake check / fmt` fails the PR if this is skipped. See also `.cursor/rules/nixfmt.mdc`.
+CI job `Flake check / fmt` runs `nix fmt -- --ci`. See also `.cursor/rules/nixfmt.mdc`.
+
+Editors (nil / VS Code Nix IDE) still use the `nixfmt` binary for single-buffer format; keep that separate from the flake tree formatter.
 
 ## Conventional commits
 

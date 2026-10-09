@@ -67,7 +67,8 @@ in
     inherit switchApp checkApp changelogApp;
   };
 
-  formatter.${system} = pkgs.nixfmt;
+  # nixfmt-tree wraps treefmt + nixfmt so `nix fmt` does not use deprecated directory recursion.
+  formatter.${system} = pkgs.nixfmt-tree;
 
   devShells.${system}.default = pkgs.mkShell {
     packages = [

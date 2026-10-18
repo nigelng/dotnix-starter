@@ -33,7 +33,7 @@ jobs:
           echo "hosts=$hosts" >> "$GITHUB_OUTPUT"
 
   eval:
-    runs-on: macos-14
+    runs-on: macos-latest
     timeout-minutes: 15
     steps:
       - name: Checkout
@@ -61,7 +61,7 @@ jobs:
         run: nix flake check --no-build --option warn-dirty false
 
   fmt:
-    runs-on: macos-14
+    runs-on: macos-latest
     timeout-minutes: 10
     steps:
       - name: Checkout
@@ -101,7 +101,7 @@ jobs:
     needs:
       - eval
       - setup
-    runs-on: macos-14
+    runs-on: macos-latest
     timeout-minutes: 90
     strategy:
       fail-fast: false

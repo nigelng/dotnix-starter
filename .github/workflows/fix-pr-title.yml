@@ -58,7 +58,7 @@ jobs:
               "",
               "See also: [Conventional commits (AGENTS.md)](" + docUrl + ")",
               "",
-              "Current title: `" + title + "`",
+              "Current title: " + JSON.stringify(title),
             ].join("\n");
 
             const { data: comments } = await github.rest.issues.listComments({

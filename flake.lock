@@ -7,11 +7,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1783744694,
-        "narHash": "sha256-2cp6N3rrwnGYLTx9l6N+NI+kwrCWxvJUbj5WJhvB29A=",
+        "lastModified": 1792800221,
+        "narHash": "sha256-53jIZEWNh96irEXhsMZFoNhLJgGSU3nYl1i4wFQHAsU=",
         "owner": "LnL7",
         "repo": "nix-darwin",
-        "rev": "c3e90c89649b07d1a96e4b9dd6cd0d6e44b91a74",
+        "rev": "d31953cf55f9027a56e9be938daf5db8c5655663",
         "type": "github"
       },
       "original": {
@@ -24,11 +24,11 @@
     "eslint-config": {
       "flake": false,
       "locked": {
-        "lastModified": 1783262650,
-        "narHash": "sha256-5vzL6AbTcnqJ0xWgyFd87c88aeBgU6XIPeANXZg3z9E=",
+        "lastModified": 1793550903,
+        "narHash": "sha256-6CuaZ19iOhNOGzifFGDI54cfEnpWN7Vo2krSyGnFgwE=",
         "owner": "nigelng",
         "repo": "eslint-config",
-        "rev": "9b9e36c011213968594d8bbdf048c20fe75c882d",
+        "rev": "9420489cb8e013c5ecd5e5499cf6757f799463b0",
         "type": "github"
       },
       "original": {
@@ -44,11 +44,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1792274446,
-        "narHash": "sha256-AM1HmBeDnB2B3dSiXuCYeu7Me+lHNpz/P39lVxGJBuQ=",
+        "lastModified": 1792818383,
+        "narHash": "sha256-199i7ubVSXTMl+0AAlL7cVCXSjcI+jWByMcimYjeMX0=",
         "owner": "nix-community",
         "repo": "home-manager",
-        "rev": "ab3823b4b24c0c3ca984c1f3ee577fd6d667424c",
+        "rev": "24f2190587513b9c2f73db112a17844ae912d965",
         "type": "github"
       },
       "original": {
@@ -60,11 +60,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1792295010,
-        "narHash": "sha256-F7meJtbqGttmUoMmYjRRgkVs42sn7bh7vvRvLPlUN98=",
+        "lastModified": 1793526781,
+        "narHash": "sha256-2Cxxgpz1+cRgKZJFi12/9LG3aIBN66f2RvFs34Oj/A0=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "8ce73368d1efd4d657e9064d29b144a52046b4e8",
+        "rev": "9bb52223f4f6a0cc606fd0852d8784f896c137d5",
         "type": "github"
       },
       "original": {
@@ -77,11 +77,11 @@
     "prettier-config": {
       "flake": false,
       "locked": {
-        "lastModified": 1783261371,
-        "narHash": "sha256-/OFCtFULcAIYhzn1akC+SUy2V9OxYIS/Y1sEzaFC1vI=",
+        "lastModified": 1793548070,
+        "narHash": "sha256-pSfjE8in/73YVj6cX0Jf8gHdyrveQ07gxCR62qrpN7A=",
         "owner": "nigelng",
         "repo": "prettier-config",
-        "rev": "d6ad2f874c5b9a11603899621112df18af9df4a1",
+        "rev": "7c570de8f4bda4d8746e41f79f4debe1bf75221b",
         "type": "github"
       },
       "original": {

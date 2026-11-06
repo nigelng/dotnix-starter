@@ -1,0 +1,29 @@
+name: vendor-check
+
+# Verifies .agents/skills/ matches the lifecycle tag stamped in
+# .agents/skills/.nng-kit-version. Re-vendor with:
+#   bash plugins/lifecycle/scripts/vendor-skills.sh <this-repo>
+# in an nng-kit checkout (or against a newer lifecycle-v* tag).
+
+on:
+  pull_request:
+    paths:
+      - '.agents/skills/**'
+      - '.github/workflows/vendor-check.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.agents/skills/**'
+      - '.github/workflows/vendor-check.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  vendor-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: nigelng/nng-kit/plugins/lifecycle/ci/vendor-check@lifecycle-v0.6.0

@@ -1,0 +1,7 @@
+# vendored from github.com/nigelng/nng-kit — do not edit .agents/skills copies; edit the
+# plugin in nng-kit and re-vendor. Drift gate: ci/vendor-check composite action.
+plugin=lifecycle
+version=0.6.0
+tag=lifecycle-v0.6.0
+skills=brainstorm commit critique execute-plan gh-create-pr gh-draft-release gh-tag-release make-plan
+vendored_at=2026-11-06

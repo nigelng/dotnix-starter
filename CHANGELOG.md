@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
 
+## [1.0.20] - 2026-11-06
+
+
+### Added
+
+- skills: vendor lifecycle skills from nng-kit (#54)
+
+
+### Changed
+
+- replace retired macos-14 runners (#51)
+
+- update flake inputs (#46)
+
+- make agents.md the single source of agent instructions (#53)
+
+
+
+
 ## [1.0.19] - 2026-10-09
 
 ### Fixed

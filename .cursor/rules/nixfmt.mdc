@@ -7,27 +7,6 @@ alwaysApply: true
 
 # nixfmt required
 
-This repository’s flake `formatter` is `pkgs.nixfmt-tree` (treefmt wrapping official `nixfmt`). CI runs `nix fmt -- --ci` (`Flake check / fmt`). Unformatted Nix fails the PR.
+The formatting gate, commands and editor notes live in `AGENTS.md` § nixfmt — follow that section.
 
-## Required before every commit that touches Nix
-
-1. After editing any `*.nix` files, format them with the flake formatter:
-
-   ```sh
-   nix fmt
-   ```
-
-2. Confirm clean (same check as CI):
-
-   ```sh
-   nix fmt -- --ci
-   ```
-
-3. Do **not** commit or push Nix changes until the check passes.
-
-## Notes
-
-- Prefer bare `nix fmt` from the repo flake (matches CI). That path avoids nixfmt 1.x’s deprecated directory recursion.
-- Optional local hook: `pre-commit install` (see `.pre-commit-config.yaml`) formats then runs `--ci` on commit.
-- Editors should keep calling the `nixfmt` binary for a single buffer; flake format uses `nixfmt-tree`.
-- Applies to cloud and local Cursor agents alike — treat this as a hard gate, not a nice-to-have.
+Applies to cloud and local Cursor agents alike — treat this as a hard gate, not a nice-to-have.

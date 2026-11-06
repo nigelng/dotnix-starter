@@ -40,7 +40,7 @@ jobs:
             const marker = "<!-- semantic-pr-title -->";
             const docUrl =
               "https://github.com/" + owner + "/" + repo +
-              "/blob/main/.cursor/rules/semantic-commits.mdc";
+              "/blob/main/AGENTS.md#conventional-commits";
 
             const body = [
               marker,
@@ -56,9 +56,9 @@ jobs:
               "",
               "**Rules:** description starts with a lowercase letter, imperative mood, no trailing period.",
               "",
-              "See also: [semantic-commits rule](" + docUrl + ")",
+              "See also: [Conventional commits (AGENTS.md)](" + docUrl + ")",
               "",
-              "Current title: `" + title + "`",
+              "Current title: " + JSON.stringify(title),
             ].join("\n");
 
             const { data: comments } = await github.rest.issues.listComments({

@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
 
+## [1.1.0] - 2026-11-23
+
+
+### Added
+
+- vscode: gate cursor and vs code modules on their casks (#60)
+
+
+### Fixed
+
+- editor-tooling: update flake inputs and regenerate npm lock for prettier 3.9.9 (#52)
+
+
+
+
 ## [1.0.20] - 2026-11-06
 
 

@@ -642,7 +642,7 @@ pre-commit install
 pre-commit run --all-files
 ```
 
-Hooks (see `.pre-commit-config.yaml`): **`nix fmt`** (writes, then `nix fmt -- --ci`) on `*.nix`, `shellcheck` on `scripts/*.sh` and `build-darwin.sh`. Agents must also run `nix fmt` before committing Nix (see [AGENTS.md](AGENTS.md) and `.cursor/rules/nixfmt.mdc`). Not required for CI beyond the flake `fmt` job.
+Hooks (see `.pre-commit-config.yaml`): **`nix fmt`** (writes, then `nix fmt -- --ci`) on `*.nix`, `shellcheck` on `scripts/*.sh` and `build-darwin.sh`, and `scripts/test-correctness.sh all` when `lib/`, `darwin/`, `home/`, `config/`, `flake.nix`/`flake.lock`, `build-darwin.sh` or the harness changes. Agents must also run `nix fmt` before committing Nix (see [AGENTS.md](AGENTS.md) and `.cursor/rules/nixfmt.mdc`). Not required for CI beyond the flake `fmt` job.
 
 ### Releasing
 
@@ -683,7 +683,7 @@ Do not create a private/paid cache for this template — macos overlays should r
 
 GitHub Actions on `macos-14` (Apple Silicon; update the runner image when validating newer macOS — see [docs/MACOS-27.md](docs/MACOS-27.md)):
 
-- **Evaluate flake** — verifies every host in `config/hosts.json` has matching JSON under `config/hosts/`, `config/apps/hosts/`, `config/fonts/hosts/`, and (when present) Firefox/Android hosts; validates against `config/schema/*.schema.json`; then `nix flake check --no-build` (includes app/font package name and Firefox slug validation).
+- **Evaluate flake** — verifies every host in `config/hosts.json` has matching JSON under `config/hosts/`, `config/apps/hosts/`, `config/fonts/hosts/`, and (when present) Firefox/Android hosts; validates against `config/schema/*.schema.json`; then `nix flake check --no-build` (includes app/font package name and Firefox slug validation); then `scripts/test-correctness.sh all` (app fallbacks, GC schedule, Android lists/schema, Git includes, install wrapper).
 - **Nix formatting** — dedicated job: `nix fmt -- --ci` (flake formatter is `pkgs.nixfmt-tree` / treefmt).
 - **Per-host build** (`.github/workflows/flake.yml`) — matrix derived from `config/hosts.json`: builds `.#checks.aarch64-darwin.<host>`.
 - **shellcheck** — `scripts/*.sh` and `build-darwin.sh` on Ubuntu.

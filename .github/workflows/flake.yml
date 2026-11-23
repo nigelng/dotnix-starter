@@ -60,6 +60,10 @@ jobs:
       - name: Evaluate flake (no build)
         run: nix flake check --no-build --option warn-dirty false
 
+      - name: Run correctness regressions
+        # app fallbacks, weekly GC, Android lists/schema, Git includes, install wrapper
+        run: nix develop --command bash scripts/test-correctness.sh all
+
   fmt:
     runs-on: macos-latest
     timeout-minutes: 10

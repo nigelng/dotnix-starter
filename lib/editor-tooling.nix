@@ -28,7 +28,7 @@ let
     pname = "nigelng-editor-tooling";
     version = "1.0.0";
     src = toolingSrc;
-    npmDepsHash = "sha256-kPK+PBfBhKESG6zrq7BOcGiV76ehgabi7j/ATZi6J6Y=";
+    npmDepsHash = "sha256-TFbmhJZwoKd0q5EMAUM69Zns3h+8Ijj/XqYjmCrOKs8=";
     npmDepsFetcherVersion = 2;
     npmFlags = [ "--legacy-peer-deps" ];
     dontNpmBuild = true;

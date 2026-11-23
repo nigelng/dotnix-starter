@@ -1,7 +1,7 @@
-# Cursor (+ optional Devin settings): extensions and user settings via home-manager.
-# The Cursor module is on only when a `cursor`/`code-cursor` cask is listed in apps JSON
-# or the user sets programs.cursor.enable = true; HM manages config only, never the app.
-# commonBase in ./vscode/extensions.nix is the Cursor HM extension set (and reinstate base for VS Code).
+# Cursor and VS Code (+ optional Devin settings): extensions and user settings via home-manager.
+# Each editor module is on only when its cask is listed in apps JSON (`cursor`/`code-cursor`,
+# `visual-studio-code`) or the user sets programs.<cursor|vscode>.enable = true; HM manages
+# config only, never the app. commonBase in ./vscode/extensions.nix is the shared extension set.
 # Devin (when casked) shares the settings pipeline only — not commonBase extension installs.
 # Nix IDE, Python Environments, and Pylance are CLI-pinned for Cursor (engine lags upstream).
 {
@@ -24,6 +24,9 @@ let
     "code-cursor"
   ];
   cursorEnabled = config.programs.cursor.enable;
+
+  vscodeCask = lib.elem "visual-studio-code" appConfig.casks;
+  vscodeEnabled = config.programs.vscode.enable;
 
   applyToAllProfiles = [
     "remote.localPortHost"
@@ -74,14 +77,16 @@ let
   mkEditorSettings =
     extras: lib.recursiveUpdate sharedSettings (nixToolPaths // jsLintSettings // extras);
 
-  # Shared settings pipeline: Cursor (active) and Devin (when cask present).
-  # Future VS Code: mkEditorSettings { …vscode-only prefs… } + programs.vscode = mkEditor "vscode" …
-  # with extensions = commonBase ++ [ nixIdeVscode pythonEnvsVscode pylanceVscode ] (++ optional vscodeOnly).
+  # Shared settings pipeline: Cursor, VS Code and Devin (each when enabled / casked).
   devinSettings = mkEditorSettings {
     workbench.settings.applyToAllProfiles = applyToAllProfiles;
   };
 
   cursorSettings = mkEditorSettings {
+    workbench.settings.applyToAllProfiles = applyToAllProfiles;
+  };
+
+  vscodeSettings = mkEditorSettings {
     workbench.settings.applyToAllProfiles = applyToAllProfiles;
   };
 
@@ -107,6 +112,9 @@ let
     lib.optionals cursorEnabled [
       "${config.home.homeDirectory}/Library/Application Support/Cursor/User/settings.json"
     ]
+    ++ lib.optionals vscodeEnabled [
+      "${config.home.homeDirectory}/Library/Application Support/Code/User/settings.json"
+    ]
     ++ lib.optionals hasDevin [
       "${config.home.homeDirectory}/Library/Application Support/Devin/User/settings.json"
     ];
@@ -126,9 +134,12 @@ let
 
 in
 {
-  # VS Code HM path intentionally disabled; reinstate via mkEditor + commonBase (see extensions.nix).
   programs.cursor = mkEditor "cursor" cursorSettings // {
     enable = lib.mkDefault cursorCask;
+  };
+
+  programs.vscode = mkEditor "vscode" vscodeSettings // {
+    enable = lib.mkDefault vscodeCask;
   };
 
   home.activation.editorUserSettingsWritable = mkWritableEditorSettingsActivation editorUserSettingsPaths;

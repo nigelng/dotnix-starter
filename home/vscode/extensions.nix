@@ -1,7 +1,7 @@
-# Shared extension sets for Cursor (active) and future VS Code reinstatement.
+# Shared extension sets for Cursor and VS Code (each enabled by its cask; see home/vscode.nix).
 # commonBase is the Cursor HM foundation — do not dissolve into an anonymous list.
 # Devin shares the settings pipeline in home/vscode.nix only (not this extension list).
-# nix-ide, python-envs, and pylance are CLI-pinned for Cursor (not listed in commonBase).
+# nix-ide, python-envs, and pylance are CLI-pinned for Cursor and HM-installed for VS Code.
 {
   pkgs,
   lib ? pkgs.lib,
@@ -33,15 +33,12 @@ let
       streetsidesoftware.code-spell-checker-australian-english
     ]);
 
-  # Kept as separate attrs so VS Code can HM-install them again on reinstatement.
-  # Cursor installs these via CLI in home/vscode.nix (HM symlinks alone are not enough).
+  # Separate attrs: VS Code HM-installs them; Cursor installs them via CLI in
+  # home/vscode.nix (its engine lags upstream; HM symlinks alone are not enough).
   nixIdeVscode = vscode-extensions.jnoortheen.nix-ide;
   pythonEnvsVscode = vscode-extensions.ms-python.vscode-python-envs;
   pylanceVscode = vscode-extensions.ms-python.vscode-pylance;
 
-  # Future VS Code reinstate example:
-  # vscodeOnly = [ anthropic.claude-code github.copilot-chat … ];
-  # vscode = lib.unique (commonBase ++ [ nixIdeVscode pythonEnvsVscode pylanceVscode ] ++ vscodeOnly);
 in
 {
   inherit
@@ -51,4 +48,12 @@ in
     pylanceVscode
     ;
   cursor = lib.unique commonBase;
+  vscode = lib.unique (
+    commonBase
+    ++ [
+      nixIdeVscode
+      pythonEnvsVscode
+      pylanceVscode
+    ]
+  );
 }

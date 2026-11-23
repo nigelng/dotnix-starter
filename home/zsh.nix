@@ -11,6 +11,15 @@ let
   theme = import ./themes/default.nix;
 
   # Bake LS_COLORS at build time so interactive shells do not spawn vivid.
+  # GUI editor for VISUAL: Cursor, else VS Code, else neovim's defaultEditor (nvim).
+  guiVisual =
+    if config.programs.cursor.enable then
+      "cursor"
+    else if config.programs.vscode.enable then
+      "code"
+    else
+      null;
+
   vividLsColors = pkgs.runCommand "vivid-ls-colors-${theme.vividTheme}" { } ''
     ${pkgs.vivid}/bin/vivid generate ${lib.escapeShellArg theme.vividTheme} > "$out"
   '';
@@ -28,8 +37,8 @@ in
     '')
   ];
 
-  # When Cursor is enabled, override neovim defaultEditor (sets VISUAL=nvim) so GUI tools open Cursor.
-  home.sessionVariables.VISUAL = lib.mkIf config.programs.cursor.enable (lib.mkForce "cursor");
+  # When Cursor or VS Code is enabled, override neovim defaultEditor (sets VISUAL=nvim) so GUI tools open it.
+  home.sessionVariables.VISUAL = lib.mkIf (guiVisual != null) (lib.mkForce guiVisual);
 
   # HM symlinks ~/.p10k.zsh from the store (read-only); p10k configure must write the file.
   home.activation.p10kConfigWritable = mkWritableCopyActivation [
@@ -69,8 +78,8 @@ in
     sessionVariables = {
       EDITOR = "nvim";
     }
-    // lib.optionalAttrs config.programs.cursor.enable {
-      VISUAL = "cursor";
+    // lib.optionalAttrs (guiVisual != null) {
+      VISUAL = guiVisual;
     }
     // lib.optionalAttrs config.programs.granted.enable {
       # Skip Granted's interactive ~/.zshenv alias installer (we manage assume below).

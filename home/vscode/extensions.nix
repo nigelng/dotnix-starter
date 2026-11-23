@@ -1,5 +1,5 @@
 # Shared extension sets for Cursor and VS Code (each enabled by its cask; see home/vscode.nix).
-# commonBase is the Cursor HM foundation — do not dissolve into an anonymous list.
+# commonBase is the shared Cursor/VS Code HM foundation — do not dissolve into an anonymous list.
 # Devin shares the settings pipeline in home/vscode.nix only (not this extension list).
 # nix-ide, python-envs, and pylance are CLI-pinned for Cursor and HM-installed for VS Code.
 {

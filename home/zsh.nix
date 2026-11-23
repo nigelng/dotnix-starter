@@ -10,7 +10,6 @@
 let
   theme = import ./themes/default.nix;
 
-  # Bake LS_COLORS at build time so interactive shells do not spawn vivid.
   # GUI editor for VISUAL: Cursor, else VS Code, else neovim's defaultEditor (nvim).
   guiVisual =
     if config.programs.cursor.enable then
@@ -20,6 +19,7 @@ let
     else
       null;
 
+  # Bake LS_COLORS at build time so interactive shells do not spawn vivid.
   vividLsColors = pkgs.runCommand "vivid-ls-colors-${theme.vividTheme}" { } ''
     ${pkgs.vivid}/bin/vivid generate ${lib.escapeShellArg theme.vividTheme} > "$out"
   '';

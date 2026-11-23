@@ -3,7 +3,7 @@
 # `visual-studio-code`) or the user sets programs.<cursor|vscode>.enable = true; HM manages
 # config only, never the app. commonBase in ./vscode/extensions.nix is the shared extension set.
 # Devin (when casked) shares the settings pipeline only — not commonBase extension installs.
-# Nix IDE, Python Environments, and Pylance are CLI-pinned for Cursor (engine lags upstream).
+# Nix IDE, Python Environments, and Pylance are CLI-pinned for Cursor (engine lags upstream); HM-installed for VS Code.
 {
   config,
   pkgs,

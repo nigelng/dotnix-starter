@@ -113,7 +113,7 @@ in
       };
 
       # Quoted path required (spaces); settings.* does not add quotes for IdentityAgent.
-      extraConfig = ''
+      extraConfig = lib.mkIf config.my.onePassword.enable ''
         IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
       '';
     };
@@ -157,7 +157,7 @@ in
 
     file.".p10k.zsh".source = lib.mkDefault ./config_files/p10k.zsh;
 
-    stateVersion = "26.05";
+    stateVersion = lib.mkDefault "26.05";
     sessionPath = systemConfig.extraSessionPaths;
     packages =
       userApps
@@ -173,7 +173,6 @@ in
     shellAliases = {
       # Set all shell aliases programatically
       # Aliases for commonly used tools
-      find = "fd";
       cls = "clear";
       wo = "cd ~/Workspaces";
       Gcg = "git gc";

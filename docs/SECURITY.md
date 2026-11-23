@@ -39,10 +39,10 @@ nix-darwin does **not** manage disk encryption or Gatekeeper assessment policy. 
 
 - Track `config/user.json` in git (name, email, GPG key id, SSH public signing key). Copy from `config/user.json.example`, edit, and `git add` — flakes only see tracked files. Overlays fail closed if it is missing; the starter may pass `allowExample = true` for CI.
 - Do not put API tokens, private keys, or 1Password item ids in Nix or in `user.json`.
-- SSH uses the 1Password agent; git commit signing uses SSH via `op-ssh-sign` (`gpg.format = "ssh"`), not a private key in the repo.
+- SSH uses the 1Password agent, and git commit/tag signing uses SSH via `op-ssh-sign` (`gpg.format = "ssh"`), only when `my.onePassword.enable` is true (default: the `1password` or `1password@beta` cask is listed). Otherwise there is no `IdentityAgent` and commits are unsigned. Either way, no private key is in the repo.
 - Prefer short-lived injection with `op run --env-file=.env` over exporting tokens into the shell environment.
 - The commented `load_secret` alias in `home/zsh.nix` puts secrets in process environment if enabled — avoid for long-lived tokens.
-- Install `_1password-cli` via apps JSON if you use `op` on the CLI.
+- Install `_1password-cli` via apps JSON if you use `op` on the CLI. The CLI alone does not enable the agent or signing; set `my.onePassword.enable = true` if the 1Password app is installed outside the casks list.
 
 ## Homebrew
 

@@ -61,7 +61,8 @@ jobs:
         run: nix flake check --no-build --option warn-dirty false
 
       - name: Run correctness regressions
-        # app fallbacks, weekly GC, Android lists/schema, Git includes, install wrapper
+        # app fallbacks, weekly GC, Android lists/schema, Git includes + 1Password signing gate,
+        # zsh init guards, example-mac host defaults, Cursor installer, install wrapper
         run: nix develop --command bash scripts/test-correctness.sh all
 
   fmt:

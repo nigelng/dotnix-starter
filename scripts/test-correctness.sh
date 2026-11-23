@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Focused regression checks for default-install and JSON-config correctness.
 #
-# Usage: scripts/test-correctness.sh [apps|gc|android|git|wrapper|all]
+# Usage: scripts/test-correctness.sh [apps|gc|android|git|shell|host|cursor|wrapper|all]
 #   (default: all). Run from anywhere; the repo root is derived from this file.
 #
 # Tools (nix, jq, python3 jsonschema) are only required by the cases that use
@@ -10,7 +10,8 @@
 #
 # No case activates a system, escalates privileges, garbage-collects, or builds
 # the Android SDK or a full darwin system: app tests use fake nix/sudo/
-# darwin-rebuild executables, and the other cases only evaluate.
+# darwin-rebuild executables, and the other cases only evaluate (the cursor case
+# also builds one tiny writeShellScript to run it against a fake cursor).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -580,43 +581,142 @@ test_android() {
   test_android_schema
 }
 
-# --- case: git -----------------------------------------------------------------
+# --- Home Manager shape evaluation (git, shell, host, cursor) --------------------
 
-# Evaluates the real home/git.nix through Home Manager for three gitConfig shapes
-# (no includes key, empty list, several conditional/unconditional includes). Only
-# the git config file and include list are read, so nothing is built.
-nix_git_expr() {
+# Shared Nix prelude (an open `let`): each case appends its own bindings and the
+# `in` body. pkgsUnfree lets _1password-cli and editor extensions evaluate.
+nix_hm_prelude() {
   cat <<'NIX'
 let
   rootDir = builtins.getEnv "T_ROOT";
   flake = builtins.getFlake "git+file://${rootDir}";
   hm = flake.inputs.home-manager;
-  pkgs = flake.inputs.nixpkgs.legacyPackages.${builtins.currentSystem};
-  evalGit =
-    gitConfig:
-    let
-      cfg =
-        (hm.lib.homeManagerConfiguration {
-          inherit pkgs;
-          modules = [
-            "${rootDir}/home/git.nix"
-            {
-              home = {
-                username = "tester";
-                homeDirectory = "/Users/tester";
-                stateVersion = "25.11";
-              };
-            }
-          ];
-          extraSpecialArgs = {
-            inherit gitConfig;
-            userConfig = {
-              name = "Test User";
-              email = "test@example.com";
-              defaultSigningKey = "ssh-ed25519 AAAA";
-            };
+  inherit (flake.inputs.nixpkgs) lib;
+  system = builtins.currentSystem;
+  pkgs = flake.inputs.nixpkgs.legacyPackages.${system};
+  pkgsUnfree = import flake.inputs.nixpkgs {
+    inherit system;
+    config.allowUnfree = true;
+  };
+  userConfig = {
+    name = "Test User";
+    email = "test@example.com";
+    defaultSigningKey = "ssh-ed25519 AAAA";
+  };
+  appConfigOf = casks: {
+    inherit casks;
+    system = [ ];
+    user = [ ];
+  };
+  mkWritableOf =
+    pkgs:
+    import "${rootDir}/lib/mk-writable-copy-activation.nix" {
+      hmLib = hm.lib;
+      inherit lib pkgs;
+    };
+  evalHm =
+    {
+      pkgs,
+      modules,
+      args,
+    }:
+    (hm.lib.homeManagerConfiguration {
+      inherit pkgs;
+      modules = modules ++ [
+        {
+          home = {
+            username = "tester";
+            homeDirectory = "/Users/tester";
+            stateVersion = "25.11";
           };
-        }).config;
+        }
+      ];
+      extraSpecialArgs = args;
+    }).config;
+NIX
+}
+
+# eval_shapes EXPR: evaluate an attrset of independent probes as JSON. Each probe
+# is wrapped in tryEval, so one that cannot evaluate yet (an option a later step
+# adds, say) reports ok=false instead of hiding the others.
+eval_shapes() {
+  run_eval nix eval --impure --json --expr "let s = $1; in builtins.mapAttrs (_: v: let t = builtins.tryEval (builtins.deepSeq v v); in if t.success then t.value // { ok = true; } else { ok = false; }) s"
+}
+
+# err_summary: the key lines of the last evaluation's stderr (else its tail).
+err_summary() {
+  local keys
+  keys="$(printf '%s\n' "$EVAL_ERR" | grep -E 'error:|does not exist|conflict' | head -n 3 || true)"
+  if [ -n "$keys" ]; then
+    printf '%s\n' "$keys"
+  else
+    printf '%s\n' "$EVAL_ERR" | tail -n 8
+  fi
+}
+
+# shape_ok LABEL RESULTS_JSON EXPR NAME: pass-through guard for a probe; on a
+# failed probe, re-evaluates it alone to surface the Nix error and returns 1.
+shape_ok() {
+  if [ "$(jq -r --arg n "$4" '.[$n].ok' <<<"$2")" = true ]; then
+    return 0
+  fi
+  run_eval nix eval --impure --json --expr "let s = $3; in s.\"$4\""
+  fail "$1: evaluates" "$(err_summary)"
+  return 1
+}
+
+# The checks below print only the matching lines (never the whole generated
+# file), since the texts they inspect are long.
+check_has() { # label haystack needle
+  if printf '%s' "$2" | grep -qF -- "$3"; then
+    pass "$1"
+  else
+    fail "$1" "missing: $3"
+  fi
+}
+
+check_lacks() { # label haystack needle
+  if printf '%s\n' "$2" | grep -nF -- "$3" >"$TMP/match.out"; then
+    fail "$1" "unexpected: $3" "$(cat "$TMP/match.out")"
+  else
+    pass "$1"
+  fi
+}
+
+# check_no_line LABEL TEXT ERE: no line of TEXT matches the extended regex.
+check_no_line() {
+  if printf '%s\n' "$2" | grep -nE -- "$3" >"$TMP/match.out"; then
+    fail "$1" "unexpected line matching: $3" "$(cat "$TMP/match.out")"
+  else
+    pass "$1"
+  fi
+}
+
+# --- case: git -----------------------------------------------------------------
+
+# Evaluates the real home/git.nix through Home Manager for the gitConfig shapes
+# (no includes key, empty list, several conditional/unconditional includes) and
+# the 1Password signing shapes (casks, option override, no appConfig at all,
+# appConfig via _module.args).
+# Only the git config file and include list are read, so nothing is built.
+nix_git_expr() {
+  nix_hm_prelude
+  cat <<'NIX'
+  evalGit =
+    {
+      gitConfig ? { },
+      casks ? null,
+      modules ? [ ],
+    }:
+    let
+      cfg = evalHm {
+        inherit pkgs;
+        modules = [ "${rootDir}/home/git.nix" ] ++ modules;
+        args = {
+          inherit gitConfig userConfig;
+        }
+        // lib.optionalAttrs (casks != null) { appConfig = appConfigOf casks; };
+      };
     in
     {
       includes = map (i: {
@@ -627,10 +727,14 @@ let
     };
 in
 {
-  missing = evalGit { };
-  empty = evalGit { includes = [ ]; };
+  missing = evalGit { casks = [ ]; };
+  empty = evalGit {
+    casks = [ ];
+    gitConfig.includes = [ ];
+  };
   multi = evalGit {
-    includes = [
+    casks = [ ];
+    gitConfig.includes = [
       { path = "/fixture/user-a.gitconfig"; }
       {
         condition = "gitdir:~/work/";
@@ -642,6 +746,19 @@ in
         path = "/fixture/user-d.gitconfig";
       }
     ];
+  };
+  nocask = evalGit { casks = [ "firefox" ]; };
+  cask = evalGit { casks = [ "1password" ]; };
+  beta = evalGit { casks = [ "1password@beta" ]; };
+  clionly = evalGit { casks = [ "1password-cli" ]; };
+  override = evalGit {
+    casks = [ ];
+    modules = [ { my.onePassword.enable = true; } ];
+  };
+  noappconfig = evalGit { };
+  # appConfig supplied via _module.args instead of extraSpecialArgs.
+  moduleargs = evalGit {
+    modules = [ { _module.args.appConfig = appConfigOf [ "1password" ]; } ];
   };
 }
 NIX
@@ -677,22 +794,369 @@ check_git_results() { # results-json
   check_contains "git/multi: generated config has conditional user path" "$sections" 'path = "/fixture/user-d.gitconfig"'
 }
 
+check_git_signing_off() { # label text
+  check_lacks "$1: no gpgSign" "$2" 'gpgSign'
+  check_lacks "$1: no op-ssh-sign" "$2" 'op-ssh-sign'
+  check_lacks "$1: no [gpg section" "$2" '[gpg'
+  check_has "$1: keeps user.signingKey" "$2" 'signingKey'
+}
+
+check_git_signing_on() { # label text
+  check_has "$1: op-ssh-sign program" "$2" 'op-ssh-sign'
+  check_has "$1: gpgSign = true" "$2" 'gpgSign = true'
+  check_has "$1: gpg format ssh" "$2" 'format = "ssh"'
+}
+
+# git_signing_shape RESULTS_JSON NAME on|off
+git_signing_shape() {
+  local text
+  shape_ok "git/$2" "$1" "$SHAPES_EXPR" "$2" || return 0
+  text="$(jq -r --arg n "$2" '.[$n].text' <<<"$1")"
+  "check_git_signing_$3" "git/$2" "$text"
+}
+
+check_git_signing() { # results-json
+  git_signing_shape "$1" nocask off
+  git_signing_shape "$1" cask on
+  git_signing_shape "$1" beta on
+  git_signing_shape "$1" clionly off
+  git_signing_shape "$1" override on
+  git_signing_shape "$1" noappconfig off
+  git_signing_shape "$1" moduleargs on
+}
+
 test_git() {
   need_tools nix jq
   init_tmp
   export T_ROOT="$ROOT"
-  run_eval nix eval --impure --json --expr "$(nix_git_expr)"
+  SHAPES_EXPR="$(nix_git_expr)"
+  eval_shapes "$SHAPES_EXPR"
   if [ "$EVAL_RC" != 0 ]; then
     fail "git: evaluate home/git.nix" "$EVAL_ERR"
-  else
-    check_git_results "$EVAL_OUT"
+    return 0
   fi
+  check_git_results "$EVAL_OUT"
+  check_git_signing "$EVAL_OUT"
+}
+
+# --- case: shell -----------------------------------------------------------------
+
+# Evaluates the real home/zsh.nix through Home Manager for four appConfig shapes
+# (no appConfig arg, no op/fnm apps, op as a Nix app, op via _module.args). initContent, profileExtra
+# and the zcompdump activation entry are read; _1password-cli is never built.
+nix_shell_expr() {
+  nix_hm_prelude
+  cat <<'NIX'
+  evalZshWith =
+    modules: args:
+    let
+      cfg = evalHm {
+        pkgs = pkgsUnfree;
+        modules = [ "${rootDir}/home/zsh.nix" ] ++ modules;
+        args = {
+          inherit userConfig;
+          systemConfig.homebrewPrefix = "/opt/homebrew";
+          mkWritableCopyActivation = mkWritableOf pkgsUnfree;
+        }
+        // args;
+      };
+    in
+    {
+      initContent = cfg.programs.zsh.initContent;
+      profileExtra = cfg.programs.zsh.profileExtra;
+      zcompdump = {
+        inherit (cfg.home.activation.clearStaleZcompdump) after before;
+      };
+    };
+  evalZsh = evalZshWith [ ];
+in
+{
+  noappconfig = evalZsh { };
+  noop = evalZsh { appConfig = appConfigOf [ ]; };
+  nixop = evalZsh {
+    appConfig = (appConfigOf [ ]) // {
+      system = [ "_1password-cli" ];
+    };
+  };
+  # appConfig supplied via _module.args instead of extraSpecialArgs.
+  moduleargs = evalZshWith [
+    {
+      _module.args.appConfig = (appConfigOf [ ]) // {
+        system = [ "_1password-cli" ];
+      };
+    }
+  ] { };
+}
+NIX
+}
+
+# zsh_syntax LABEL TEXT FILE: `zsh -n` on TEXT written under $TMP/zsh.
+zsh_syntax() {
+  mkdir -p "$TMP/zsh"
+  printf '%s\n' "$2" >"$TMP/zsh/$3"
+  if zsh -n "$TMP/zsh/$3" 2>"$TMP/zsh/err"; then
+    pass "$1: zsh -n accepts $3"
+  else
+    fail "$1: zsh -n accepts $3" "$(cat "$TMP/zsh/err")"
+  fi
+}
+
+# Checks shared by every shell shape. $2 is initContent, $3 profileExtra.
+# shellcheck disable=SC2016  # $+commands[...] is literal zsh syntax
+check_shell_common() { # label init profile zcompdump-json
+  check_has "$1: fnm eval is guarded" "$2" '$+commands[fnm]'
+  check_no_line "$1: no unguarded fnm eval" "$2" '^[[:space:]]*eval "\$\(fnm env'
+  check_has "$1: brew shellenv is guarded with -x" "$3" '-x /opt/homebrew/bin/brew'
+  zsh_syntax "$1" "$2" initContent.zsh
+  zsh_syntax "$1" "$3" profileExtra.zsh
+  check_eq "$1: clearStaleZcompdump runs after writeBoundary" \
+    true "$(jq -r '.after | index("writeBoundary") != null' <<<"$4")"
+  check_eq "$1: clearStaleZcompdump has no before constraint" '[]' "$(jq -c '.before' <<<"$4")"
+}
+
+# shellcheck disable=SC2016  # $+commands[...] is literal zsh syntax
+check_shell_runtime_op() { # label init
+  check_has "$1: op completion is guarded" "$2" '$+commands[op]'
+  check_no_line "$1: no unguarded op completion" "$2" '^[[:space:]]*eval "\$\(op completion'
+}
+
+check_shell_baked_op() { # label init
+  local path
+  # The package's own completion file, read-guarded and sourced (no ERE backrefs).
+  path="$(printf '%s\n' "$2" | grep -Eo '/nix/store/[^ /]*-1password-cli-[^ /]*/share/zsh/site-functions/_op' | head -n 1 || true)"
+  if [ -n "$path" ]; then
+    check_has "$1: sources the packaged op completion behind [[ -r ]]" "$2" "[[ -r $path ]] && source $path && compdef _op op"
+  else
+    fail "$1: sources the packaged op completion behind [[ -r ]]" \
+      "missing: /nix/store/...-1password-cli-.../share/zsh/site-functions/_op"
+  fi
+  check_lacks "$1: no op completion runtime call" "$2" 'op completion zsh'
+}
+
+# shell_shape RESULTS_JSON NAME runtime|baked
+shell_shape() {
+  local init profile
+  shape_ok "shell/$2" "$1" "$SHAPES_EXPR" "$2" || return 0
+  init="$(jq -r --arg n "$2" '.[$n].initContent' <<<"$1")"
+  profile="$(jq -r --arg n "$2" '.[$n].profileExtra' <<<"$1")"
+  check_shell_common "shell/$2" "$init" "$profile" "$(jq -c --arg n "$2" '.[$n].zcompdump' <<<"$1")"
+  if [ "$3" = baked ]; then
+    check_shell_baked_op "shell/$2" "$init"
+  else
+    check_shell_runtime_op "shell/$2" "$init"
+  fi
+}
+
+test_shell() {
+  need_tools nix jq zsh
+  init_tmp
+  export T_ROOT="$ROOT"
+  SHAPES_EXPR="$(nix_shell_expr)"
+  eval_shapes "$SHAPES_EXPR"
+  if [ "$EVAL_RC" != 0 ]; then
+    fail "shell: evaluate home/zsh.nix" "$EVAL_ERR"
+    return 0
+  fi
+  shell_shape "$EVAL_OUT" noappconfig runtime
+  shell_shape "$EVAL_OUT" noop runtime
+  shell_shape "$EVAL_OUT" nixop baked
+  shell_shape "$EVAL_OUT" moduleargs baked
+}
+
+# --- case: host ----------------------------------------------------------------
+
+# Evaluates darwinConfigurations.example-mac (the shipped default host) and two
+# extendModules variants; nothing is built. T_USER is the host's adminUsername.
+nix_host_expr() {
+  cat <<'NIX'
+let
+  flake = builtins.getFlake "git+file://${builtins.getEnv "T_ROOT"}";
+  user = builtins.getEnv "T_USER";
+  host = flake.darwinConfigurations.example-mac;
+  hmOf = sys: sys.config.home-manager.users.${user};
+  gitText = hmCfg: hmCfg.xdg.configFile."git/config".text;
+  base = hmOf host;
+  withOnePassword = hmOf (
+    host.extendModules {
+      modules = [ { home-manager.users.${user}.my.onePassword.enable = true; } ];
+    }
+  );
+  withVersions = host.extendModules {
+    modules = [
+      {
+        system.stateVersion = 5;
+        home-manager.users.${user}.home.stateVersion = "25.11";
+      }
+    ];
+  };
+in
+{
+  ssh.value = base.programs.ssh.extraConfig;
+  git.value = gitText base;
+  find.value = base.home.shellAliases ? find;
+  # null (not false) while the option is undeclared, so the check fails red.
+  option.value = base.my.onePassword.enable or null;
+  on = {
+    ssh = withOnePassword.programs.ssh.extraConfig;
+    git = gitText withOnePassword;
+  };
+  versions = {
+    system = withVersions.config.system.stateVersion;
+    home = (hmOf withVersions).home.stateVersion;
+  };
+}
+NIX
+}
+
+# host_value RESULTS_JSON NAME: the probe's .value rendered as raw text.
+host_value() { jq -r --arg n "$2" '.[$n].value' <<<"$1"; }
+
+# host_probe LABEL RESULTS_JSON NAME: shape_ok for the host expression.
+host_probe() { shape_ok "$1" "$2" "$SHAPES_EXPR" "$3"; }
+
+check_host_defaults() { # results-json
+  if host_probe host/ssh "$1" ssh; then
+    check_lacks "host: default ssh config has no 1Password agent" "$(host_value "$1" ssh)" '1password'
+  fi
+  if host_probe host/git "$1" git; then
+    check_lacks "host: default git config has no gpgSign" "$(host_value "$1" git)" 'gpgSign'
+  fi
+  if host_probe host/find "$1" find; then
+    check_eq "host: find alias is gone" false "$(host_value "$1" find)"
+  fi
+  if host_probe host/option "$1" option; then
+    check_eq "host: my.onePassword.enable defaults to false" false "$(host_value "$1" option)"
+  fi
+}
+
+check_host_on() { # results-json
+  host_probe host/on "$1" on || return 0
+  check_has "host: enabling my.onePassword restores the IdentityAgent" \
+    "$(jq -r '.on.ssh' <<<"$1")" 'IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password'
+  check_has "host: enabling my.onePassword restores op-ssh-sign" \
+    "$(jq -r '.on.git' <<<"$1")" 'op-ssh-sign'
+}
+
+check_host_versions() { # results-json
+  host_probe host/versions "$1" versions || return 0
+  check_eq "host: system.stateVersion is overridable without mkForce" 5 "$(jq -c '.versions.system' <<<"$1")"
+  check_eq "host: home.stateVersion is overridable without mkForce" '"25.11"' "$(jq -c '.versions.home' <<<"$1")"
+}
+
+test_host() {
+  need_tools nix jq
+  init_tmp
+  export T_ROOT="$ROOT"
+  T_USER="$(jq -r '.adminUsername' "$ROOT/config/hosts/example-mac.json")"
+  export T_USER
+  SHAPES_EXPR="$(nix_host_expr)"
+  eval_shapes "$SHAPES_EXPR"
+  if [ "$EVAL_RC" != 0 ]; then
+    fail "host: evaluate darwinConfigurations.example-mac" "$EVAL_ERR"
+    return 0
+  fi
+  check_host_defaults "$EVAL_OUT"
+  check_host_on "$EVAL_OUT"
+  check_host_versions "$EVAL_OUT"
+}
+
+# --- case: cursor ----------------------------------------------------------------
+
+CURSOR_EXTENSIONS="jnoortheen.nix-ide ms-python.vscode-python-envs ms-python.vscode-pylance"
+CURSOR_DIR=""
+CURSOR_RC=0
+CURSOR_SCRIPT=""
+CURSOR_EXTENSION_COUNT=3
+
+# Evaluates home/vscode.nix with Cursor casked and builds only a text file holding
+# the installCursorPinnedExtensions activation entry (realising the small
+# writeShellScript it references). editorTooling must be passed: module arguments
+# ignore `? { }` defaults.
+nix_cursor_expr() {
+  nix_hm_prelude
+  cat <<'NIX'
+  cfg = evalHm {
+    pkgs = pkgsUnfree;
+    modules = [ "${rootDir}/home/vscode.nix" ];
+    args = {
+      appConfig = appConfigOf [ "cursor" ];
+      editorTooling = { };
+      mkWritableCopyActivation = mkWritableOf pkgsUnfree;
+    };
+  };
+in
+pkgsUnfree.writeText "cursor-pinned-activation" cfg.home.activation.installCursorPinnedExtensions.data
+NIX
+}
+
+# Fake cursor: --version ok, nothing installed, every install attempt fails.
+write_fake_cursor() { # path
+  cat >"$1" <<'FAKE'
+#!/bin/sh
+case "$1" in
+  --version) echo "0.0.0" ;;
+  --list-extensions) ;;
+  --install-extension)
+    printf 'install\t%s\n' "$2" >>"$FAKE_LOG"
+    exit 1
+    ;;
+esac
+FAKE
+  chmod +x "$1"
+}
+
+# build_cursor_script: sets CURSOR_SCRIPT to the realised install script path.
+build_cursor_script() {
+  local built
+  run_eval nix build --impure --no-link --print-out-paths --expr "$(nix_cursor_expr)"
+  if [ "$EVAL_RC" != 0 ]; then
+    fail "cursor: build the pinned-extension activation script" "$(err_summary)"
+    return 1
+  fi
+  built="$(printf '%s\n' "$EVAL_OUT" | tail -n 1)"
+  CURSOR_SCRIPT="$(grep -o '/nix/store/[^[:space:]]*install-cursor-pinned-extensions' "$built" | head -n 1 || true)"
+  if [ -z "$CURSOR_SCRIPT" ] || [ ! -x "$CURSOR_SCRIPT" ]; then
+    fail "cursor: activation entry references the install script" "activation text: $(cat "$built")"
+    return 1
+  fi
+}
+
+run_cursor_script() {
+  CURSOR_RC=0
+  env -i PATH="$CURSOR_DIR/bin:/usr/bin:/bin" HOME="$CURSOR_DIR/home" FAKE_LOG="$CURSOR_DIR/log" \
+    "$CURSOR_SCRIPT" >"$CURSOR_DIR/out" 2>"$CURSOR_DIR/err" || CURSOR_RC=$?
+}
+
+check_cursor_run() {
+  local ext
+  check_eq "cursor: failing installs do not fail activation (exit status)" 0 "$CURSOR_RC"
+  check_eq "cursor: one warning per failed extension" "$CURSOR_EXTENSION_COUNT" \
+    "$(grep -c '^warning:' "$CURSOR_DIR/err" || true)"
+  check_eq "cursor: every pinned extension is attempted" "$CURSOR_EXTENSION_COUNT" \
+    "$(grep -c '^install' "$CURSOR_DIR/log" || true)"
+  for ext in $CURSOR_EXTENSIONS; do
+    check_has "cursor: install attempted for $ext" "$(cat "$CURSOR_DIR/log")" "$(row install "$ext")"
+    check_has "cursor: warning names $ext" "$(cat "$CURSOR_DIR/err")" "$ext"
+  done
+}
+
+test_cursor() {
+  need_tools nix
+  init_tmp
+  export T_ROOT="$ROOT"
+  CURSOR_DIR="$TMP/cursor"
+  mkdir -p "$CURSOR_DIR/bin" "$CURSOR_DIR/home"
+  : >"$CURSOR_DIR/log"
+  write_fake_cursor "$CURSOR_DIR/bin/cursor"
+  build_cursor_script || return 0
+  run_cursor_script
+  check_cursor_run
 }
 
 # --- entry point ----------------------------------------------------------------
 
 usage() {
-  echo "usage: ${0##*/} [apps|gc|android|git|wrapper|all]"
+  echo "usage: ${0##*/} [apps|gc|android|git|shell|host|cursor|wrapper|all]"
 }
 
 summary() {
@@ -706,6 +1170,9 @@ main() {
     gc) test_gc ;;
     android) test_android ;;
     git) test_git ;;
+    shell) test_shell ;;
+    host) test_host ;;
+    cursor) test_cursor ;;
     wrapper) test_wrapper ;;
     all)
       test_wrapper
@@ -713,6 +1180,9 @@ main() {
       test_gc
       test_android
       test_git
+      test_shell
+      test_host
+      test_cursor
       ;;
     -h | --help)
       usage

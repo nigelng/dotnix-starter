@@ -18,7 +18,7 @@ This template is designed to work standalone **and** as a flake overlay — a pr
 **User-scope extras** (home-manager):
 
 - **direnv** (with **nix-direnv**)
-- **git** / **ssh** (1Password agent) / **gpg** (GPG agent for other uses; **commits sign with SSH** via 1Password — see Caveats)
+- **git** / **ssh** / **gpg** (GPG agent for other uses). With the 1Password app (`1password` / `1password@beta` cask, or `my.onePassword.enable = true`), SSH uses the 1Password agent and **commits sign with SSH** via 1Password; otherwise commits are unsigned — see [1Password secret loading](#1password-secret-loading) and Caveats
 - **Editor modules** (`home/vscode.nix` / `homeModules.vscode`) — manage Cursor and VS Code extensions + settings (`package = null`). Cursor turns on only when a `cursor`/`code-cursor` cask is listed in apps JSON; VS Code only when `visual-studio-code` is listed. If you install either another way, set `programs.cursor.enable = true` / `programs.vscode.enable = true`. Both share `commonBase`; VS Code also HM-installs Nix IDE, Python Environments and Pylance. Devin (optional cask) shares the **settings** pipeline only
 - **[eza](https://eza.rocks)** (modern `ls` replacement)
 - **[fzf](https://github.com/junegunn/fzf)** (Catppuccin Mocha colors)
@@ -244,7 +244,12 @@ op run --env-file=.env -- your-command
 
 An optional shell alias pattern is commented in `home/zsh.nix` (`load_secret`). Prefer `op run` over exporting long-lived tokens into the shell environment.
 
-SSH and git signing use the 1Password agent / `op-ssh-sign` (see Caveats), which needs the **1Password app**, not only the CLI.
+SSH and git signing use the 1Password agent / `op-ssh-sign` (see Caveats), which needs the **1Password app**, not only the CLI. They are gated by the home-manager option `my.onePassword.enable` (declared in `home/git.nix`):
+
+- **Default:** `true` when the merged apps casks contain `1password` or `1password@beta`; `1password-cli` alone does **not** count. The default example host has neither, so it gets no `IdentityAgent` and unsigned commits and tags (`user.signingKey` stays set).
+- **On:** SSH `IdentityAgent` points at the 1Password agent, and git sets `commit.gpgSign`, `tag.gpgSign`, `gpg.format = "ssh"` and `gpg.ssh.program` to `op-ssh-sign`.
+- **Override:** if you install 1Password another way (Mac App Store, manual download), set `my.onePassword.enable = true` in `extraHomeModules`.
+- **Shell:** `op` completion and `fnm env` run only when the binary is on PATH. When `_1password-cli` is a Nix app (apps `system`/`user`), the `op` completion is generated at build time, so shell startup never calls `op`.
 
 See: `home/zsh.nix`, [docs/SECURITY.md](docs/SECURITY.md).
 
@@ -607,7 +612,7 @@ networksetup -listallnetworkservices
 
 ### `system.stateVersion` (nix-darwin)
 
-Set to **6** in code (`darwin/system.nix`). Check the changelog before bumping:
+Set to **6** in code (`darwin/system.nix`) with `lib.mkDefault`, so overlays can set `system.stateVersion` plainly (no `mkForce`). Check the changelog before bumping:
 
 ```sh
 nix run '.#changelog'
@@ -615,7 +620,7 @@ nix run '.#changelog'
 
 ### `home.stateVersion` (home-manager)
 
-Should match the flake's home-manager release (currently **26.05**). Bump only when upgrading the `home-manager` input and after reading [HM release notes](https://nix-community.github.io/home-manager/release-notes.xhtml).
+Defaults to the flake's home-manager release (currently **26.05**) via `lib.mkDefault`, so overlays can set `home.stateVersion` plainly (no `mkForce`). Bump only when upgrading the `home-manager` input and after reading [HM release notes](https://nix-community.github.io/home-manager/release-notes.xhtml).
 
 ### Home Manager file conflicts
 
@@ -683,7 +688,7 @@ Do not create a private/paid cache for this template — macos overlays should r
 
 GitHub Actions on `macos-14` (Apple Silicon; update the runner image when validating newer macOS — see [docs/MACOS-27.md](docs/MACOS-27.md)):
 
-- **Evaluate flake** — verifies every host in `config/hosts.json` has matching JSON under `config/hosts/`, `config/apps/hosts/`, `config/fonts/hosts/`, and (when present) Firefox/Android hosts; validates against `config/schema/*.schema.json`; then `nix flake check --no-build` (includes app/font package name and Firefox slug validation); then `scripts/test-correctness.sh all` (app fallbacks, GC schedule, Android lists/schema, Git includes, install wrapper).
+- **Evaluate flake** — verifies every host in `config/hosts.json` has matching JSON under `config/hosts/`, `config/apps/hosts/`, `config/fonts/hosts/`, and (when present) Firefox/Android hosts; validates against `config/schema/*.schema.json`; then `nix flake check --no-build` (includes app/font package name and Firefox slug validation); then `scripts/test-correctness.sh all` (app fallbacks, GC schedule, Android lists/schema, Git includes and the 1Password signing gate, zsh init guards and baked `op` completion, `example-mac` host defaults, Cursor pinned-extension installer, install wrapper).
 - **Nix formatting** — dedicated job: `nix fmt -- --ci` (flake formatter is `pkgs.nixfmt-tree` / treefmt).
 - **Per-host build** (`.github/workflows/flake.yml`) — matrix derived from `config/hosts.json`: builds `.#checks.aarch64-darwin.<host>`.
 - **shellcheck** — `scripts/*.sh` and `build-darwin.sh` on Ubuntu.
@@ -704,8 +709,11 @@ Linux runners cannot build this flake; CI must stay on macOS.
 - Guest login is disabled; Remote Login (`services.openssh`) is off; screensaver requires a password immediately. FileVault and Gatekeeper stay **out of band** — see [docs/SECURITY.md](docs/SECURITY.md).
 - `EDITOR=nvim` is the terminal default; `VISUAL` is `cursor` when `programs.cursor.enable`, else `code` when `programs.vscode.enable`, else `nvim`. `VISUAL` is forced in `home.sessionVariables` so it wins over neovim `defaultEditor`.
 - SSH `HashKnownHosts` is enabled in home-manager.
-- Git signs commits with **SSH** via 1Password (`gpg.format = "ssh"` and `op-ssh-sign`), not classic GPG. Set `defaultSigningKey` in `config/user.json`. Adjust `home/git.nix` if you do not want signing.
-- **Cursor extension pins:** Cursor's VS Code engine lags upstream. **Nix IDE**, **Python Environments**, and **Pylance** are installed for Cursor via `cursor --install-extension` on home-manager activation (HM symlinks are not enough). They will not appear in marketplace search; check **Installed** or `cursor --list-extensions | grep -E 'nix-ide|python-envs|pylance'`. The installer runs only when the module is on and a real Cursor IDE answers `cursor --version` (a `cursor-cli` shim alone is not enough). If missing after switch, run manually: `cursor --install-extension jnoortheen.nix-ide --force && cursor --install-extension ms-python.vscode-python-envs --force && cursor --install-extension ms-python.vscode-pylance --force`, then reload the window.
+- Git signs commits and tags with **SSH** via 1Password (`gpg.format = "ssh"` and `op-ssh-sign`), not classic GPG, **only when `my.onePassword.enable` is true** (default: the `1password` / `1password@beta` cask is listed; see [1Password secret loading](#1password-secret-loading)). Otherwise commits and tags are unsigned and SSH has no `IdentityAgent`; `user.signingKey` (`defaultSigningKey` in `config/user.json`) stays set so you can opt back in.
+- **Shell init guards:** `op` completion and `fnm env` run only when those binaries are on PATH, and `brew shellenv` only when `<homebrewPrefix>/bin/brew` exists, so a fresh host without them starts zsh with no errors. If `_1password-cli` is a Nix app, `op` completion is baked at build time instead.
+- **`homeModules.git` / `homeModules.zsh`:** `appConfig` is optional for these modules; without it the 1Password integration is off and shell init uses the runtime guards.
+- The `find` alias (for `fd`) was removed; `fd` is still installed.
+- **Cursor extension pins:** Cursor's VS Code engine lags upstream. **Nix IDE**, **Python Environments**, and **Pylance** are installed for Cursor via `cursor --install-extension` on home-manager activation (HM symlinks are not enough). They will not appear in marketplace search; check **Installed** or `cursor --list-extensions | grep -E 'nix-ide|python-envs|pylance'`. The installer runs only when the module is on and a real Cursor IDE answers `cursor --version` (a `cursor-cli` shim alone is not enough). A failed install prints a `warning:` and activation continues. If missing after switch, run manually: `cursor --install-extension jnoortheen.nix-ide --force && cursor --install-extension ms-python.vscode-python-envs --force && cursor --install-extension ms-python.vscode-pylance --force`, then reload the window.
 - **Unfree:** `commonBase` stays free (Git Graph removed, not installed); the VS Code set adds Pylance (unfree). `nixpkgs.config.allowUnfree = true` is still required for `_1password-cli`, Android SDK, and editor/VS Code ecosystem packages overlays may need — predicate allowlists keep breaking as new unfree attrs appear.
 - **CloudFormation YAML:** Prettier is the sole YAML formatter. Prefer `Fn::` long form (`Fn::Ref`, `Fn::Sub`, …). CFN short tags (`!Ref`, `!Sub`, …) are not Prettier-safe without a dedicated CFN extension (not shipped here).
 - **Git `includes`:** entries in `config/git.json` `includes` are appended after the built-in delta theme include, in their original order, with their conditions preserved.

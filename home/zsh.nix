@@ -1,4 +1,4 @@
-{
+moduleArgs@{
   lib,
   pkgs,
   config,
@@ -9,6 +9,16 @@
 }:
 let
   theme = import ./themes/default.nix;
+
+  # appConfig is optional (homeModules.zsh is imported a la carte).
+  # specialArgs (extraSpecialArgs) first, then _module.args (unnamed args never resolve it).
+  appConfig = moduleArgs.appConfig or config._module.args.appConfig or { };
+  # When op is installed from Nix, source the completion its package generates at
+  # build time; otherwise probe at runtime.
+  opFromNix = lib.elem "_1password-cli" ((appConfig.system or [ ]) ++ (appConfig.user or [ ]));
+  # Lazy: pkgs._1password-cli (unfree) is only forced when opFromNix is true.
+  # [[ -r ]] keeps startup error-free if nixpkgs ever stops shipping the file.
+  opZshCompletion = "${pkgs._1password-cli}/share/zsh/site-functions/_op";
 
   # GUI editor for VISUAL: Cursor, else VS Code, else neovim's defaultEditor (nvim).
   guiVisual =
@@ -44,8 +54,8 @@ in
   home.activation.p10kConfigWritable = mkWritableCopyActivation [
     "${config.home.homeDirectory}/.p10k.zsh"
   ];
-  home.activation.clearStaleZcompdump = lib.hm.dag.entryBefore [ "writeBoundary" ] ''
-    rm -f "${config.home.homeDirectory}/.config/zsh/.zcompdump" \
+  home.activation.clearStaleZcompdump = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    run rm -f $VERBOSE_ARG "${config.home.homeDirectory}/.config/zsh/.zcompdump" \
           "${config.home.homeDirectory}/.config/zsh/.zcompdump.dat" \
           "${config.home.homeDirectory}/.config/zsh/.zcompdump.zwc"
   '';
@@ -144,11 +154,16 @@ in
           bindkey '^B' backward-word
           bindkey '^F' forward-word
 
-          # Suppress stderr: op can print "[ERROR] account is not signed in" when
-          # 1Password CLI isn't authenticated at shell startup, which leaks past
-          # the p10k instant prompt preamble and triggers its verbose warning.
-          eval "$(op completion zsh 2>/dev/null)"; compdef _op op
-          eval "$(fnm env --use-on-cd --shell zsh)"
+          ${
+            if opFromNix then
+              "[[ -r ${opZshCompletion} ]] && source ${opZshCompletion} && compdef _op op"
+            else
+              # Suppress stderr: op can print "[ERROR] account is not signed in" when
+              # 1Password CLI isn't authenticated at shell startup, which leaks past
+              # the p10k instant prompt preamble and triggers its verbose warning.
+              ''if (( $+commands[op] )); then eval "$(op completion zsh 2>/dev/null)" && compdef _op op; fi''
+          }
+          if (( $+commands[fnm] )); then eval "$(fnm env --use-on-cd --shell zsh)"; fi
         ''
         + (lib.optionalString config.programs.granted.enable ''
           if [[ -o interactive ]]; then
@@ -166,7 +181,7 @@ in
     ];
 
     profileExtra = ''
-      eval "$(${systemConfig.homebrewPrefix}/bin/brew shellenv)"
+      if [[ -x ${systemConfig.homebrewPrefix}/bin/brew ]]; then eval "$(${systemConfig.homebrewPrefix}/bin/brew shellenv)"; fi
     '';
   };
 }

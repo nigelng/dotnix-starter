@@ -1,5 +1,6 @@
 # Cursor (+ optional Devin settings): extensions and user settings via home-manager.
-# Install the Cursor app via apps JSON (e.g. code-cursor cask); HM manages config only.
+# The Cursor module is on only when a `cursor`/`code-cursor` cask is listed in apps JSON
+# or the user sets programs.cursor.enable = true; HM manages config only, never the app.
 # commonBase in ./vscode/extensions.nix is the Cursor HM extension set (and reinstate base for VS Code).
 # Devin (when casked) shares the settings pipeline only — not commonBase extension installs.
 # Nix IDE, Python Environments, and Pylance are CLI-pinned for Cursor (engine lags upstream).
@@ -17,6 +18,12 @@ let
   extensionSets = import ./vscode/extensions.nix { inherit pkgs lib; };
 
   hasDevin = lib.elem "devin-desktop" appConfig.casks;
+
+  cursorCask = lib.any (c: lib.elem c appConfig.casks) [
+    "cursor"
+    "code-cursor"
+  ];
+  cursorEnabled = config.programs.cursor.enable;
 
   applyToAllProfiles = [
     "remote.localPortHost"
@@ -79,7 +86,6 @@ let
   };
 
   mkEditor = name: userSettings: {
-    enable = true;
     package = null;
     profiles.default = {
       extensions = extensionSets.${name};
@@ -97,20 +103,19 @@ let
   ];
 
   # VS Code-family editors rewrite settings.json on startup; HM store symlinks are read-only.
-  editorUserSettingsPaths = [
-    "${config.home.homeDirectory}/Library/Application Support/Cursor/User/settings.json"
-  ]
-  ++ lib.optionals hasDevin [
-    "${config.home.homeDirectory}/Library/Application Support/Devin/User/settings.json"
-  ];
+  editorUserSettingsPaths =
+    lib.optionals cursorEnabled [
+      "${config.home.homeDirectory}/Library/Application Support/Cursor/User/settings.json"
+    ]
+    ++ lib.optionals hasDevin [
+      "${config.home.homeDirectory}/Library/Application Support/Devin/User/settings.json"
+    ];
 
   mkWritableEditorSettingsActivation = mkWritableCopyActivation;
 
   installCursorPinnedExtensions = pkgs.writeShellScript "install-cursor-pinned-extensions" ''
     set -euo pipefail
-    if ! command -v cursor >/dev/null 2>&1; then
-      exit 0
-    fi
+    cursor --version >/dev/null 2>&1 || exit 0
     listed=$(cursor --list-extensions 2>/dev/null || true)
     for ext in ${lib.concatStringsSep " " cursorPinnedExtensions}; do
       if ! printf '%s\n' "$listed" | grep -qx "$ext"; then
@@ -122,18 +127,22 @@ let
 in
 {
   # VS Code HM path intentionally disabled; reinstate via mkEditor + commonBase (see extensions.nix).
-  programs.cursor = mkEditor "cursor" cursorSettings;
+  programs.cursor = mkEditor "cursor" cursorSettings // {
+    enable = lib.mkDefault cursorCask;
+  };
 
   home.activation.editorUserSettingsWritable = mkWritableEditorSettingsActivation editorUserSettingsPaths;
 
-  home.activation.unmarkCursorHmExtensions = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    obsolete="$HOME/.cursor/extensions/.obsolete"
-    if [ -f "$obsolete" ]; then
-      ${pkgs.jq}/bin/jq '${cursorObsoleteJqFilter}' "$obsolete" > "$obsolete.tmp" && mv "$obsolete.tmp" "$obsolete"
-    fi
-  '';
+  home.activation.unmarkCursorHmExtensions = lib.mkIf cursorEnabled (
+    lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      obsolete="$HOME/.cursor/extensions/.obsolete"
+      if [ -f "$obsolete" ]; then
+        ${pkgs.jq}/bin/jq '${cursorObsoleteJqFilter}' "$obsolete" > "$obsolete.tmp" && mv "$obsolete.tmp" "$obsolete"
+      fi
+    ''
+  );
 
-  home.activation.installCursorPinnedExtensions =
+  home.activation.installCursorPinnedExtensions = lib.mkIf cursorEnabled (
     lib.hm.dag.entryAfter
       [
         "writeBoundary"
@@ -141,7 +150,8 @@ in
       ]
       ''
         ${installCursorPinnedExtensions}
-      '';
+      ''
+  );
 
   home.file."Library/Application Support/Devin/User/settings.json" = lib.mkIf hasDevin {
     text = builtins.toJSON devinSettings;

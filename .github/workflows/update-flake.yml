@@ -30,6 +30,11 @@ jobs:
       - name: Update lock file
         run: nix flake update
 
+      # Bumped prettier-config / eslint-config inputs invalidate the vendored
+      # npm lockfile and npmDepsHash; regenerate both so the PR builds.
+      - name: Regenerate editor-tooling lock and npmDepsHash
+        run: ./scripts/update-editor-tooling-lock.sh
+
       - name: Evaluate flake (no build)
         run: nix flake check --no-build --option warn-dirty false
 

@@ -1,7 +1,9 @@
 # Build ~/.config/editor-tooling/node_modules from flake-pinned config repos.
 # Pinned revisions: flake.lock → inputs.prettier-config / inputs.eslint-config.
-# After bumping those inputs, regenerate lib/editor-tooling-package-lock.json
-# (npm install --package-lock-only with file: deps at the locked source paths).
+# After bumping those inputs (or editing lib/editor-tooling-package.json), run
+#   scripts/update-editor-tooling-lock.sh
+# to regenerate lib/editor-tooling-package-lock.json and npmDepsHash below.
+# The weekly update-flake workflow runs it automatically.
 #
 # This flake always provides editorTooling (the prettier-config and eslint-config
 # inputs point at github:nigelng/prettier-config and github:nigelng/eslint-config).
@@ -18,19 +20,7 @@ let
     mkdir -p $out/prettier-config $out/eslint-config
     cp -r ${prettier-config}/* $out/prettier-config/
     cp -r ${eslint-config}/* $out/eslint-config/
-    cat > $out/package.json <<'EOF'
-    {
-      "name": "nigelng-editor-tooling",
-      "version": "1.0.0",
-      "private": true,
-      "dependencies": {
-        "@nigelng/prettier-config": "file:prettier-config",
-        "@nigelng/eslint-config": "file:eslint-config",
-        "eslint": "10.6.0",
-        "prettier": "3.9.4"
-      }
-    }
-    EOF
+    cp ${../lib/editor-tooling-package.json} $out/package.json
     cp ${../lib/editor-tooling-package-lock.json} $out/package-lock.json
   '';
 
@@ -38,7 +28,7 @@ let
     pname = "nigelng-editor-tooling";
     version = "1.0.0";
     src = toolingSrc;
-    npmDepsHash = "sha256-FkLEBwmtuxYBpa+v524yXhr7h9x1NjzxOlsjZzuyQ7g=";
+    npmDepsHash = "sha256-kPK+PBfBhKESG6zrq7BOcGiV76ehgabi7j/ATZi6J6Y=";
     npmDepsFetcherVersion = 2;
     npmFlags = [ "--legacy-peer-deps" ];
     dontNpmBuild = true;

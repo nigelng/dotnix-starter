@@ -230,6 +230,13 @@ let
           guiSdkSymlink = merged.guiSdkSymlink or true;
           avdDefaultSymlink = merged.avdDefaultSymlink or true;
           jdkPackage = merged.jdkPackage or "jdk";
+          platformVersions =
+            merged.platformVersions or [
+              "34"
+              "35"
+            ];
+          systemImageTypes = merged.systemImageTypes or [ "google_apis_playstore" ];
+          abiVersions = merged.abiVersions or [ "arm64-v8a" ];
         };
 
   loadHostsManifest = root: loadJson "${root}/config/hosts.json";

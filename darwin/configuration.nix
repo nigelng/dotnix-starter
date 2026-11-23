@@ -48,7 +48,12 @@ in
     gc = {
       # Garbage collection
       automatic = true;
-      interval.Day = 7;
+      # Sunday 03:00 local time (launchd StartCalendarInterval; Weekday 0 = Sunday)
+      interval = {
+        Weekday = 0;
+        Hour = 3;
+        Minute = 0;
+      };
       options = "--delete-older-than 14d";
     };
   };

@@ -164,6 +164,8 @@ nix run '.#switch'
 # or: ./build-darwin.sh
 ```
 
+Until `darwin-rebuild` is installed, the `switch` app builds the system with `nix build --no-link --print-out-paths` and runs `darwin-rebuild` from the returned store path. No `./result` symlink is created in the flake directory (which is read-only when run from the store).
+
 ### Later updates
 
 After the first install, `darwin-rebuild` is on your `PATH`:
@@ -186,6 +188,8 @@ nix flake update     # bump input pins (commit flake.lock when intentional)
 nix run '.#changelog'           # nix-darwin stateVersion notes (defaultHost)
 nix run '.#changelog' -- example-mac  # same for a specific host
 ```
+
+When `darwin-rebuild` is not installed yet, `switch` and `changelog` use the same `--no-link --print-out-paths` store-path fallback as [First build](#first-build).
 
 ---
 
@@ -356,6 +360,16 @@ This starter ships `enable: false` for `example-mac` so loaders and CI exercise 
 ```json
 { "enable": true }
 ```
+
+List settings (JSON, in `config/android/base.json` or `config/android/hosts/<host>.json`) default to:
+
+| Key                | Default                       |
+| ------------------ | ----------------------------- |
+| `platformVersions` | `["34", "35"]`                |
+| `systemImageTypes` | `["google_apis_playstore"]`   |
+| `abiVersions`      | `["arm64-v8a"]`               |
+
+A host list replaces the base list (shallow merge), including an explicit `[]`. `config/schema/android.schema.json` sets `additionalProperties: false`, so unknown keys fail validation.
 
 Then `darwin-rebuild switch`. Overlay repos without `config/android/` get a no-op (`enable = false`). Thin overlays should pass `loadAndroidConfig` into `darwinConfigurationsBuilder` (see below).
 
@@ -615,6 +629,10 @@ Do not commit API tokens, private keys, or `.env` files (see `.gitignore`). Trac
 
 See [docs/MACOS-27.md](docs/MACOS-27.md) for the weekly lockfile cadence, Dependabot Actions pins, and the checklist for Apple major releases / Nix channel bumps. Channel bumps are **manual** `flake.nix` ref edits — `nix flake update` alone stays on `*-26.05`.
 
+### Nix garbage collection
+
+Automatic GC is enabled via a launchd job that runs weekly on Sunday at 03:00 local time, with `--delete-older-than 14d`. Set in `darwin/configuration.nix`.
+
 ### Pre-commit (optional)
 
 Install [pre-commit](https://pre-commit.com/) locally for fast feedback before push:
@@ -690,4 +708,5 @@ Linux runners cannot build this flake; CI must stay on macOS.
 - **Cursor extension pins:** Cursor's VS Code engine lags upstream. **Nix IDE**, **Python Environments**, and **Pylance** are installed for Cursor via `cursor --install-extension` on home-manager activation (HM symlinks are not enough). They will not appear in marketplace search; check **Installed** or `cursor --list-extensions | grep -E 'nix-ide|python-envs|pylance'`. The installer runs only when the module is on and a real Cursor IDE answers `cursor --version` (a `cursor-cli` shim alone is not enough). If missing after switch, run manually: `cursor --install-extension jnoortheen.nix-ide --force && cursor --install-extension ms-python.vscode-python-envs --force && cursor --install-extension ms-python.vscode-pylance --force`, then reload the window.
 - **Unfree:** `commonBase` stays free (Git Graph removed, not installed); the VS Code set adds Pylance (unfree). `nixpkgs.config.allowUnfree = true` is still required for `_1password-cli`, Android SDK, and editor/VS Code ecosystem packages overlays may need — predicate allowlists keep breaking as new unfree attrs appear.
 - **CloudFormation YAML:** Prettier is the sole YAML formatter. Prefer `Fn::` long form (`Fn::Ref`, `Fn::Sub`, …). CFN short tags (`!Ref`, `!Sub`, …) are not Prettier-safe without a dedicated CFN extension (not shipped here).
+- **Git `includes`:** entries in `config/git.json` `includes` are appended after the built-in delta theme include, in their original order, with their conditions preserved.
 - **Leaving VS Code:** drop the `visual-studio-code` cask; the module turns off. After switching, remove leftover extensions under `~/.vscode/extensions` if you still see old HM symlinks.

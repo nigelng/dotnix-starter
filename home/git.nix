@@ -31,7 +31,8 @@ in
         {
           path = ./themes/delta-catppuccin.gitconfig;
         }
-      ];
+      ]
+      ++ (gitConfig.includes or [ ]);
 
       lfs = {
         enable = true;

@@ -5,5 +5,5 @@
   "trustedCasks": {},
   "brews": ["mas", "mole"],
   "casks": ["firefox"],
-  "user": ["fd"]
+  "user": ["fd", "pre-commit", "shellcheck"]
 }

@@ -663,7 +663,7 @@ Automatic GC is enabled via a launchd job that runs weekly on Sunday at 03:00 lo
 
 ### Pre-commit (optional)
 
-Install [pre-commit](https://pre-commit.com/) locally for fast feedback before push:
+[pre-commit](https://pre-commit.com/) and `shellcheck` are installed as user packages via `config/apps/base.json`, so after a rebuild you can enable the hooks for fast feedback before push:
 
 ```sh
 pre-commit install

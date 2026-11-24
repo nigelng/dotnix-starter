@@ -121,7 +121,8 @@ jobs:
         uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa
 
       - name: Run shellcheck
-        run: nix develop --command shellcheck scripts/*.sh build-darwin.sh
+        # The flake's dev shell is aarch64-darwin only; run shellcheck from the locked nixpkgs instead.
+        run: nix run --inputs-from . nixpkgs#shellcheck -- scripts/*.sh build-darwin.sh
 
   check:
     needs:

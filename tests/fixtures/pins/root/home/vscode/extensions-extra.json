@@ -1,0 +1,14 @@
+[
+  {
+    "publisher": "tomoyukim",
+    "name": "vscode-mermaid-editor",
+    "version": "0.19.1",
+    "hash": "sha256-MZkR9wPTj+TwhQP0kbH4XqlTvQwfkbiZdfzA10Q9z5A="
+  },
+  {
+    "publisher": "streetsidesoftware",
+    "name": "code-spell-checker-australian-english",
+    "version": "1.1.32",
+    "hash": "sha256-zn/DIzrF5sJ/jMGbc6IOQz6pTNZOBhimqMvpuuYal0k="
+  }
+]

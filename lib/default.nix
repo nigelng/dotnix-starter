@@ -52,6 +52,17 @@ let
     base: host: name:
     lib.unique (listAttr base name ++ listAttr host name);
 
+  # Pure merge: lists are unioned (deduplicated), maps are host-wins per key.
+  mergeAppConfig = base: host: {
+    system = mergeLists base host "system";
+    user = mergeLists base host "user";
+    taps = mergeLists base host "taps";
+    trustedCasks = objAttr base "trustedCasks" // objAttr host "trustedCasks";
+    brews = mergeLists base host "brews";
+    casks = mergeLists base host "casks";
+    mas = objAttr base "mas" // objAttr host "mas";
+  };
+
   loadAppConfig =
     root: hostName:
     let
@@ -66,23 +77,13 @@ let
             Add config/apps/hosts/${hostName}.json for each entry in config/hosts.json (use {} if there are no host-only apps).
           '';
     in
-    {
-      system = mergeLists base host "system";
-      user = mergeLists base host "user";
-      taps = mergeLists base host "taps";
-      trustedCasks = objAttr base "trustedCasks" // objAttr host "trustedCasks";
-      brews = mergeLists base host "brews";
-      casks = mergeLists base host "casks";
-      mas = objAttr base "mas" // objAttr host "mas";
-    };
+    mergeAppConfig base host;
 
   hostPresets = import ./host-presets.nix { inherit lib; };
 
-  loadHostConfig =
-    root: hostName:
-    let
-      raw = loadRawHostConfig root hostName;
-    in
+  # Pure: validate machineType and fill preset defaults for one raw host attrset.
+  resolveHostConfig =
+    hostName: raw:
     if !(raw ? machineType) then
       builtins.throw ''
         loadHostConfig: config/hosts/${hostName}.json must set "machineType" ("laptop" or "macmini").
@@ -110,7 +111,17 @@ let
         # until nix-darwin supports the new OS (see docs/MACOS-27.md).
         automaticallyInstallMacOSUpdates =
           if raw ? automaticallyInstallMacOSUpdates then raw.automaticallyInstallMacOSUpdates else true;
+        claudeKit = raw.claudeKit or false;
       };
+
+  loadHostConfig = root: hostName: resolveHostConfig hostName (loadRawHostConfig root hostName);
+
+  mergeFontConfig = base: host: {
+    casks = mergeLists base host "casks";
+    google = mergeLists base host "google";
+    nerd = mergeLists base host "nerd";
+    pkgs = mergeLists base host "pkgs";
+  };
 
   loadFontConfig =
     root: hostName:
@@ -126,12 +137,7 @@ let
             Add config/fonts/hosts/${hostName}.json for each entry in config/hosts.json (use {} if there are no host-only fonts).
           '';
     in
-    {
-      casks = mergeLists base host "casks";
-      google = mergeLists base host "google";
-      nerd = mergeLists base host "nerd";
-      pkgs = mergeLists base host "pkgs";
-    };
+    mergeFontConfig base host;
 
   # Merge a base settings attrset with a host settings attrset (host wins per-key).
   mergeSettings =
@@ -152,6 +158,20 @@ let
     {
       nix = mergeLists baseExt hostExt "nix";
       manual = mergeLists baseExt hostExt "manual";
+    };
+
+  # Pure merge. `enable` (host wins over base) is emitted only when either side
+  # sets it, so downstream can tell "unset" from false via `firefoxConfig ? enable`.
+  mergeFirefoxConfig =
+    base: host:
+    {
+      # Host profileName overrides base if present.
+      profileName = host.profileName or base.profileName or "default";
+      settings = mergeSettings base host;
+      extensions = mergeExtensions base host;
+    }
+    // lib.optionalAttrs (base ? enable || host ? enable) {
+      enable = host.enable or base.enable;
     };
 
   loadFirefoxConfig =
@@ -183,13 +203,34 @@ let
               loadFirefoxConfig: missing ${hostPath}
               Add config/firefox/hosts/${hostName}.json for each entry in config/hosts.json (use {} if there are no host-only Firefox overrides).
             '';
-        # Host profileName overrides base if present.
-        profileName = if host ? profileName then host.profileName else base.profileName or "default";
+      in
+      mergeFirefoxConfig base host;
+
+  # Pure merge. Throws if base sets "enable" (it is per-host only); checked
+  # before `host` is forced so a bad base fails first.
+  mergeAndroidConfig =
+    base: host:
+    if base ? enable then
+      builtins.throw ''
+        loadAndroidConfig: config/android/base.json must not contain "enable" (use hosts/<host>.json instead).
+      ''
+    else
+      let
+        merged = base // host;
       in
       {
-        inherit profileName;
-        settings = mergeSettings base host;
-        extensions = mergeExtensions base host;
+        enable = merged.enable or false;
+        avdHome = merged.avdHome or null;
+        guiSdkSymlink = merged.guiSdkSymlink or true;
+        avdDefaultSymlink = merged.avdDefaultSymlink or true;
+        jdkPackage = merged.jdkPackage or "jdk";
+        platformVersions =
+          merged.platformVersions or [
+            "34"
+            "35"
+          ];
+        systemImageTypes = merged.systemImageTypes or [ "google_apis_playstore" ];
+        abiVersions = merged.abiVersions or [ "arm64-v8a" ];
       };
 
   loadAndroidConfig =
@@ -207,32 +248,39 @@ let
       let
         hostPath = "${root}/config/android/hosts/${hostName}.json";
         base = loadJson basePath;
+        host =
+          if builtins.pathExists hostPath then
+            loadJson hostPath
+          else
+            builtins.throw ''
+              loadAndroidConfig: missing ${hostPath}
+              Add config/android/hosts/${hostName}.json for each entry in config/hosts.json (use { "enable": false } if Android is off for this host).
+            '';
       in
-      if base ? enable then
-        builtins.throw ''
-          loadAndroidConfig: config/android/base.json must not contain "enable" (use hosts/<host>.json instead).
-        ''
-      else
-        let
-          host =
-            if builtins.pathExists hostPath then
-              loadJson hostPath
-            else
-              builtins.throw ''
-                loadAndroidConfig: missing ${hostPath}
-                Add config/android/hosts/${hostName}.json for each entry in config/hosts.json (use { "enable": false } if Android is off for this host).
-              '';
-          merged = base // host;
-        in
-        {
-          enable = merged.enable or false;
-          avdHome = merged.avdHome or null;
-          guiSdkSymlink = merged.guiSdkSymlink or true;
-          avdDefaultSymlink = merged.avdDefaultSymlink or true;
-          jdkPackage = merged.jdkPackage or "jdk";
-        };
+      mergeAndroidConfig base host;
 
-  loadHostsManifest = root: loadJson "${root}/config/hosts.json";
+  # Pure: hosts must be a non-empty list and defaultHost (when set) one of them.
+  checkHostsManifest =
+    manifest:
+    let
+      hosts = manifest.hosts or null;
+    in
+    if !(builtins.isList hosts) || hosts == [ ] then
+      builtins.throw ''
+        checkHostsManifest: config/hosts.json must set "hosts" to a non-empty list of host names.
+      ''
+    else if manifest ? defaultHost && !(builtins.isString manifest.defaultHost) then
+      builtins.throw ''
+        checkHostsManifest: config/hosts.json defaultHost must be a string (a host name from "hosts"), got ${builtins.typeOf manifest.defaultHost}.
+      ''
+    else if manifest ? defaultHost && !(builtins.elem manifest.defaultHost hosts) then
+      builtins.throw ''
+        checkHostsManifest: config/hosts.json defaultHost "${toString manifest.defaultHost}" must be one of hosts: ${builtins.concatStringsSep ", " (map toString hosts)}.
+      ''
+    else
+      manifest;
+
+  loadHostsManifest = root: checkHostsManifest (loadJson "${root}/config/hosts.json");
 
 in
 {
@@ -247,5 +295,11 @@ in
     loadFirefoxConfig
     loadAndroidConfig
     loadHostsManifest
+    mergeAppConfig
+    mergeFontConfig
+    mergeFirefoxConfig
+    mergeAndroidConfig
+    resolveHostConfig
+    checkHostsManifest
     ;
 }

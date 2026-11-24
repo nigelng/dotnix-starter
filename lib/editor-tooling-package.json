@@ -5,7 +5,7 @@
   "dependencies": {
     "@nigelng/prettier-config": "file:prettier-config",
     "@nigelng/eslint-config": "file:eslint-config",
-    "eslint": "10.6.0",
-    "prettier": "3.9.9"
+    "eslint": "10.15.0",
+    "prettier": "3.10.1"
   }
 }

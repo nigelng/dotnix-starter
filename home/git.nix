@@ -1,14 +1,32 @@
-{
+moduleArgs@{
   pkgs,
+  lib,
+  config,
   gitConfig,
   userConfig,
   ...
 }:
 let
+  # Optional: overlays import homeModules.git à la carte without appConfig.
+  # specialArgs (extraSpecialArgs) first, then _module.args (unnamed args never resolve it).
+  appConfig = moduleArgs.appConfig or config._module.args.appConfig or { };
+  cfg = config.my.onePassword;
   theme = import ./themes/default.nix;
 in
 {
-  programs = {
+  options.my.onePassword.enable = lib.mkOption {
+    type = lib.types.bool;
+    default = lib.any (c: lib.elem c (appConfig.casks or [ ])) [
+      "1password"
+      "1password@beta"
+    ];
+    defaultText = lib.literalExpression ''
+      lib.any (c: lib.elem c (appConfig.casks or [ ])) [ "1password" "1password@beta" ]
+    '';
+    description = "1Password app integration: SSH agent (IdentityAgent) and op-ssh-sign git signing.";
+  };
+
+  config.programs = {
     gh = {
       enable = true;
       settings = {
@@ -31,7 +49,8 @@ in
         {
           path = ./themes/delta-catppuccin.gitconfig;
         }
-      ];
+      ]
+      ++ (gitConfig.includes or [ ]);
 
       lfs = {
         enable = true;
@@ -45,13 +64,13 @@ in
           "useConfigOnly" = true;
           signingKey = userConfig.defaultSigningKey;
         };
-        commit = {
+        commit = lib.mkIf cfg.enable {
           gpgSign = true;
         };
-        tag = {
+        tag = lib.mkIf cfg.enable {
           gpgSign = true;
         };
-        gpg = {
+        gpg = lib.mkIf cfg.enable {
           format = "ssh";
           ssh = {
             program = "/Applications/1Password.app/Contents/MacOS/op-ssh-sign";

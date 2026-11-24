@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nigelng/dotnix-starter/config/schema/user.schema.json",
+  "title": "User identity config",
+  "description": "config/user.json (falls back to config/user.json.example): git identity and signing keys read unguarded by home/git.nix and home/default.nix. No format patterns because the shipped example holds placeholders.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["name", "email", "defaultGpgKey", "defaultSigningKey"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1, "description": "Git user.name." },
+    "email": { "type": "string", "minLength": 1, "description": "Git user.email." },
+    "defaultGpgKey": { "type": "string", "minLength": 1, "description": "Default GPG key id." },
+    "defaultSigningKey": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Default commit signing key (for example an SSH public key)."
+    }
+  }
+}

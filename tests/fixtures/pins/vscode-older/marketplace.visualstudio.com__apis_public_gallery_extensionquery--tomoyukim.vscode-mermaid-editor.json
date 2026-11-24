@@ -1,0 +1,26 @@
+{
+  "results": [
+    {
+      "extensions": [
+        {
+          "versions": [
+            {
+              "version": "0.19.0",
+              "targetPlatform": null,
+              "properties": [
+                {
+                  "key": "Microsoft.VisualStudio.Code.Engine",
+                  "value": "^1.75.0"
+                },
+                {
+                  "key": "Microsoft.VisualStudio.Services.VsixSha256",
+                  "value": "daba26ad1611abc3d21a17e44212229fcb62d73624db9ae171a91454d0bf4b65"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

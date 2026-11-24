@@ -12,18 +12,20 @@ disable-model-invocation: true
 
 Brainstorm an idea with the user: explore the codebase for feasibility, iterate on the concept until the user is satisfied, then produce a high-level roadmap and a ready-to-use `/make-plan` prompt.
 
+> **Under /conduct:** Step 7 and the "never invoke /make-plan" constraint are replaced by the conductor; see [../conduct/stage-overrides.md](../conduct/stage-overrides.md#brainstorm). Standalone behaviour is unchanged.
+
 This skill is read-only except for persisting its own output. It does not edit code or commit. It produces a prompt that the user can paste into `/make-plan` to turn the agreed idea into an implementation plan.
 
 ## Session model (top-tier)
 
-Session/Task tiers: [model-tiers.md](model-tiers.md) (`top`/`mid`/`low`). `/brainstorm` needs **top** for the whole session; warn once and recommend switching if below top — do not silently run a thin brainstorm.
+Warn once and recommend switching if the session is below the host's **top-plan** pin (`tiers.sh resolve <host> top-plan`); if the session model is unlisted, say so in one line, continue (see [model-tiers.md](model-tiers.md)).
 
 ## Step 1 — Gather the idea
 
-If arguments were provided (the user's slash-command or message args), use them as the initial idea and continue to **When NOT to brainstorm** — do **not** skip Step 1.5 or jump to Step 2.
+If arguments were provided (slash-command or message args), use them as the initial idea and continue to **When NOT to brainstorm** — do **not** skip Step 1.5 or jump to Step 2.
 
-If no arguments were given, use `AskQuestion` when available; otherwise ask conversationally:
-- **What idea do you want to brainstorm?** (free-text via the "Other" option is expected — offer 2-4 example options inferred from the current project's recent commits, open files, or TODOs, plus "Other" for custom input)
+If no arguments were given, use the question tool (`AskQuestion`/`AskUserQuestion`/`ask_user_question`) when available; otherwise ask conversationally:
+- **What idea do you want to brainstorm?** (free-text via "Other" is expected — offer 2-4 example options inferred from the project's recent commits, open files, or TODOs, plus "Other" for custom input)
 
 Use the response as the initial idea, then continue to **When NOT to brainstorm**.
 
@@ -50,10 +52,10 @@ The four facets:
 Process:
 
 1. **Extract** Goal / why-now / non-goals / hard constraints from args + the user message when already stated.
-2. **Ask only gaps** — one `AskQuestion` (or conversational ask) per missing facet: 2–4 options plus "Other" per call; never pack multiple facets into one 4-option call.
+2. **Ask only gaps** — batch up to 4 independent facet questions per the question tool (or conversational ask): 2–4 options plus "Other" per facet in the call.
 3. **Compress** when the idea is tiny or args already encode the brief: confirm a drafted 4-line brief in one turn instead of four interviews.
 4. **Floor**: if any of the four lines is still empty after extraction, ask until filled. Never proceed to exploration with a blank brief. Never silently skip this step because args existed in Step 1.
-5. Carry the brief verbatim into Step 6 (`/make-plan` handoff) and Step 6.5 (persisted brainstorm) so the eventual plan starts from the same Goal, not a re-interpreted one.
+5. Carry the brief verbatim into Step 6 (`/make-plan` handoff) and Step 6.5 (persisted brainstorm) so the plan starts from the same Goal, not a re-interpreted one.
 
 Keep the brief to four short lines, not a discussion.
 
@@ -87,7 +89,7 @@ If the idea is not feasible, say so directly and explain what would need to chan
 
 ## Step 4 — Ideate iteratively
 
-This is the core loop. Present a concrete proposal for the idea, grounded in what you found in Step 2. Then use `AskQuestion` when available (otherwise ask conversationally) to let the user steer:
+This is the core loop. Present a concrete proposal for the idea, grounded in what you found in Step 2. Then use the question tool when available (otherwise ask conversationally) to let the user steer:
 
 - **Direction** — offer 2-4 concrete approaches to the idea, each with trade-offs.
 - **Scope** — what to include vs. defer (e.g. minimal viable vs. full vision).
@@ -145,7 +147,7 @@ Produce a single prompt that the user can paste into `/make-plan` to turn the ag
 Format the prompt in a fenced code block so the user can copy-paste it cleanly:
 
 ```
-/make-plan <task description>. Goal: <one-sentence Goal from the Step 1.5 brief>. Scope: <in/out>. Constraints: <list>. Target Phase 1: <phase name and deliverable>. Brainstorm: docs/brainstorms/<yymmddhhmm>-<slug>.md
+/make-plan <task description>. Goal: <one-sentence Goal from the Step 1.5 brief>. Scope: <in/out>. Constraints: <list>. Target Phase 1: <phase name and deliverable>. Brainstorm: docs/brainstorms/<YYYY-MM-DD>-<slug>.md
 ```
 
 If the prompt is too long for a single line, use a multi-line fenced block and instruct the user to paste it after `/make-plan`.
@@ -154,15 +156,15 @@ If the prompt is too long for a single line, use a multi-line fenced block and i
 
 Run this step **after** Step 6 so the saved file includes the produced `/make-plan` prompt.
 
-Determine the project root with `git rev-parse --show-toplevel` (fall back to the current working directory if not a git repo).
+Determine the project root with `git rev-parse --show-toplevel` (else the current working directory).
 
 Derive a kebab-case slug from the idea title (lowercase, hyphen-separated; drop common English stopwords). Example: "Add a plugin system" → `add-plugin-system`.
 
-On the **first** completion of Steps 5–6 for this brainstorm, generate a timestamp with `date +%y%m%d%H%M` (2-digit year, month, day, hour, minute — e.g. `2607051430`) and set the path to `<project-root>/docs/brainstorms/<yymmddhhmm>-<slug>.md`. On **Refine** (Step 7 → back to Step 4), **overwrite that same path** — do not create a new timestamped file.
+On the **first** completion of Steps 5–6 for this brainstorm, set the date with `date +%Y-%m-%d` (e.g. `2026-11-08`) and the path to `<project-root>/docs/brainstorms/<YYYY-MM-DD>-<slug>.md`. If that path already exists, append `-2`, `-3`, and so on before `.md` until unused. Write a YAML frontmatter block at the top containing only `created_at: <ISO-8601Z>` (set once with `date -u +%Y-%m-%dT%H:%M:%SZ`). On **Refine** (Step 7 → back to Step 4), **overwrite that same path** and **preserve** the existing `created_at` — do not create a new dated file.
 
-Create the `docs/brainstorms/` directory at the project root if it doesn't exist, then write the brainstorm to the path above.
+Create `docs/brainstorms/` at the project root if missing, then write the brainstorm to the path above.
 
-The file must contain: the Step 1.5 Goal brief, the Step 3 feasibility assessment, the Step 5 roadmap (strategy, architecture, phases, can/can't/deferring lists), and the Step 6 make-plan prompt (verbatim).
+The file must contain: frontmatter with `created_at`, the Step 1.5 Goal brief, the Step 3 feasibility assessment, the Step 5 roadmap (strategy, architecture, phases, can/can't/deferring lists), and the Step 6 make-plan prompt (verbatim).
 
 ## Step 7 — Offer next steps
 

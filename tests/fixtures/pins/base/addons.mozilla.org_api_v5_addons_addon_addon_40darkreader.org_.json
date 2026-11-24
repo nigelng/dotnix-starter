@@ -1,0 +1,11 @@
+{
+  "guid": "addon@darkreader.org",
+  "slug": "x",
+  "current_version": {
+    "version": "1",
+    "file": {
+      "url": "https://addons.mozilla.org/firefox/downloads/file/4859299/darkreader-4.9.128.xpi",
+      "hash": "sha256:31be69e5e783e30dc255ee357f2a7233486f801cba061560f1a44deb9603296f"
+    }
+  }
+}

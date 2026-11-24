@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nigelng/dotnix-starter/config/schema/hosts.schema.json",
+  "title": "nix-darwin host manifest",
+  "description": "config/hosts.json: the list of hosts built by the flake. Membership of defaultHost in hosts is checked by scripts/validate-host-json.sh and the Nix loader, not by this schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["hosts"],
+  "properties": {
+    "hosts": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Host names; each must have a matching config/hosts/<name>.json."
+    },
+    "defaultHost": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional host used by default builds. Must be one of hosts (checked outside this schema)."
+    }
+  }
+}

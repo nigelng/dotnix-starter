@@ -18,7 +18,12 @@
   ],
   "properties": {
     "description": { "type": "string", "minLength": 1 },
-    "adminUsername": { "type": "string", "minLength": 1 },
+    "adminUsername": {
+      "type": "string",
+      "minLength": 1,
+      "not": { "pattern": "[\\s*]" },
+      "description": "Admin username. No whitespace or \"*\"."
+    },
     "machineType": { "type": "string", "enum": ["laptop", "macmini"] },
     "computerName": { "type": "string", "minLength": 1 },
     "hostName": { "type": "string", "minLength": 1 },
@@ -31,12 +36,12 @@
     },
     "trustedUsers": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": { "type": "string", "minLength": 1, "not": { "pattern": "[\\s*]" } },
       "description": "Extra Nix trusted-users beyond adminUsername. Never use \"*\" — trusted users can add substituters without a password prompt."
     },
     "allowedUsers": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": { "type": "string", "minLength": 1, "not": { "pattern": "[\\s*]" } },
       "minItems": 1,
       "description": "Nix allowed-users. Prefer explicit usernames; never use \"*\"."
     },

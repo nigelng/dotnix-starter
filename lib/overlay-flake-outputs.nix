@@ -31,8 +31,8 @@ let
         exec sudo darwin-rebuild switch --flake ".#''${HOST}"
       fi
       echo "First install: building system, then switching…"
-      nix build ".#darwinConfigurations.''${HOST}.system"
-      exec sudo ./result/sw/bin/darwin-rebuild switch --flake ".#''${HOST}"
+      system_path=$(nix build --no-link --print-out-paths ".#darwinConfigurations.''${HOST}.system")
+      exec sudo "$system_path/sw/bin/darwin-rebuild" switch --flake ".#''${HOST}"
     '';
   };
 
@@ -57,8 +57,8 @@ let
         exec darwin-rebuild changelog --flake ".#''${HOST}"
       fi
       echo "darwin-rebuild not found. Building system, then showing changelog…"
-      nix build ".#darwinConfigurations.''${HOST}.system"
-      exec ./result/sw/bin/darwin-rebuild changelog --flake ".#''${HOST}"
+      system_path=$(nix build --no-link --print-out-paths ".#darwinConfigurations.''${HOST}.system")
+      exec "$system_path/sw/bin/darwin-rebuild" changelog --flake ".#''${HOST}"
     '';
   };
 in
@@ -72,6 +72,7 @@ in
 
   devShells.${system}.default = pkgs.mkShell {
     packages = [
+      pkgs.git-cliff
       pkgs.jq
       pkgs.nix
       pkgs.nixfmt

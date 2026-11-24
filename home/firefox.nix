@@ -70,6 +70,19 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    assertions =
+      let
+        insecure = lib.filter (e: !(lib.hasPrefix "https://" (e.url or ""))) cfg.manualExtensions;
+      in
+      [
+        {
+          assertion = insecure == [ ];
+          message = "my.firefox.manualExtensions: url must start with https:// for: ${
+            lib.concatMapStringsSep ", " (e: e.name or e.addonId or "<unnamed>") insecure
+          }";
+        }
+      ];
+
     programs.firefox = {
       enable = true;
       # Always null: Firefox.app comes from the Homebrew cask, never nixpkgs.

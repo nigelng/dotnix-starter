@@ -16,6 +16,7 @@ concurrency:
 jobs:
   check-title:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Require conventional commit PR title
         # actions/github-script@v9

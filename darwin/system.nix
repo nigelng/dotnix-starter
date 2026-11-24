@@ -23,7 +23,7 @@ in
   system = {
     primaryUser = userConfig.user;
     # Set once at install; bump only after `darwin-rebuild changelog` (see README).
-    stateVersion = 6;
+    stateVersion = lib.mkDefault 6;
 
     keyboard = {
       enableKeyMapping = true;

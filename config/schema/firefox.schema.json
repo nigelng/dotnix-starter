@@ -7,7 +7,7 @@
   "properties": {
     "enable": {
       "type": "boolean",
-      "description": "Opt-in per host for overlay browserEnable. Intended for config/firefox/hosts/<host>.json only, not base.json."
+      "description": "Sets the my.firefox.enable default (lib.mkDefault). Allowed in base.json or hosts/<host>.json; the host value wins. Host files are only read when base.json exists."
     },
     "profileName": {
       "type": "string",
@@ -58,7 +58,8 @@
               },
               "url": {
                 "type": "string",
-                "minLength": 1
+                "minLength": 1,
+                "pattern": "^https://"
               },
               "hash": {
                 "type": "string",

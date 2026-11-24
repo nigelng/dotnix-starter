@@ -1,0 +1,37 @@
+{
+  "rev": "06bfe0d62a98375cb09c942fa18e68bd32cff057",
+  "fonts": {
+    "fira": {
+      "path": "ofl/firasans",
+      "hash": "sha256-oMG8NAP7Jethbldweq3MeE1m3hD8Qc2KSSzSUTvsEvs="
+    },
+    "fira-mono": {
+      "path": "ofl/firamono",
+      "hash": "sha256-daf189IaQajXboYvWVDsfZ34T5qOs4HWEz+dD5FQL8k="
+    },
+    "ibm-plex": {
+      "path": "ofl/ibmplexsans",
+      "hash": "sha256-XqOUmV3m/F7cmZVFmwsbhOi95Tk7DziCCUNxM3DkT7k="
+    },
+    "inter": {
+      "path": "ofl/inter",
+      "hash": "sha256-wpjTwCir7Vh8W/yoRrM9yDxYNCpIi7WejyasDfhpdps="
+    },
+    "lato": {
+      "path": "ofl/lato",
+      "hash": "sha256-EU0naeRc8nBcEeQPoGD5n6CEpBv+oVKYq3UOiXIHGBA="
+    },
+    "manrope": {
+      "path": "ofl/manrope",
+      "hash": "sha256-necdjijpZC1kt6u54cK7MIGPpgzQ0ecyGvXa9++DZoU="
+    },
+    "open-sans": {
+      "path": "ofl/opensans",
+      "hash": "sha256-f77/eGA9BfrD86NYjlbcAySVKipILpIaV4Hv9DvY5XE="
+    },
+    "poppins": {
+      "path": "ofl/poppins",
+      "hash": "sha256-vM6IL7RouFSyturmQhHKcfzaovexVxDBir7eCrNIeEk="
+    }
+  }
+}

@@ -14,7 +14,7 @@
   description = "nix-darwin + home-manager template (macOS)";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-26.05-darwin";
 
     home-manager = {
       url = "github:nix-community/home-manager/release-26.05";
@@ -22,7 +22,7 @@
     };
 
     darwin = {
-      url = "github:LnL7/nix-darwin/nix-darwin-26.05";
+      url = "github:nix-darwin/nix-darwin/nix-darwin-26.05";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -140,6 +140,93 @@
         '';
       };
 
+      # Eval-time assertion so `nix flake check --no-build` fails on a red test.
+      libTests = import ./tests/lib.nix { inherit lib; };
+
+      starterChecks = {
+        lib-tests =
+          assert lib.assertMsg (
+            libTests.results == [ ]
+          ) "tests/lib.nix failures: ${builtins.toJSON libTests.results}";
+          assert lib.assertMsg (
+            libTests.count >= 20
+          ) "tests/lib.nix ran only ${toString libTests.count} tests (expected >= 20)";
+          pkgs.runCommand "lib-tests" { } "touch $out";
+
+        fmt =
+          pkgs.runCommand "fmt-check"
+            {
+              nativeBuildInputs = [ pkgs.nixfmt-tree ];
+            }
+            ''
+              export HOME="$TMPDIR"
+              cp -r ${self} src
+              chmod -R u+w src
+              cd src
+              treefmt --ci --tree-root .
+              touch $out
+            '';
+
+        shellcheck =
+          pkgs.runCommand "shellcheck"
+            {
+              nativeBuildInputs = [ pkgs.shellcheck ];
+            }
+            ''
+              cd ${self}
+              shellcheck scripts/*.sh build-darwin.sh
+              touch $out
+            '';
+
+        # Builds every pinned source (google-fonts, extra VS Code extensions, AMO add-ons,
+        # bat theme) so a stale or mistyped hash in a *-pins.json sidecar fails CI.
+        pinned-sources =
+          let
+            addons = import ./home/firefox/addons.nix {
+              pkgs = pkgsForValidation;
+              inherit lib;
+            };
+            googleFonts = import ./overlays/google-fonts pkgsForValidation pkgsForValidation;
+            extensionsExtra = import ./home/vscode/extensions-extra.nix { pkgs = pkgsForValidation; };
+            batThemeSrc = pkgsForValidation.fetchFromGitHub (lib.importJSON ./home/bat-theme-pin.json);
+          in
+          pkgs.linkFarm "pinned-sources" (
+            lib.mapAttrsToList (name: path: { inherit name path; }) (
+              googleFonts
+              // lib.listToAttrs (
+                map (drv: lib.nameValuePair "extensions-extra-${drv.name}" drv) (
+                  lib.collect lib.isDerivation extensionsExtra
+                )
+              )
+              // lib.mapAttrs' (
+                slug: entry: lib.nameValuePair "amo-${slug}" (addons.mkAddon entry)
+              ) addons.catalog
+              // {
+                bat-theme = batThemeSrc;
+              }
+            )
+          );
+
+        json-schema =
+          pkgs.runCommand "json-schema"
+            {
+              nativeBuildInputs = [ validateHostJsonScript ];
+            }
+            ''
+              cp -r ${self} src
+              chmod -R u+w src
+              cd src
+              for s in host apps fonts firefox android hosts user git; do
+                test -f "config/schema/$s.schema.json" || {
+                  echo "missing config/schema/$s.schema.json" >&2
+                  exit 1
+                }
+              done
+              validate-host-json "$PWD"
+              touch $out
+            '';
+      };
+
       overlayOutputs = import ./lib/overlay-flake-outputs.nix {
         inherit
           self
@@ -217,7 +304,7 @@
         };
         git = import ./home/git.nix;
         vim = import ./home/vim.nix;
-        # Cursor editor module (commonBase shared; VS Code HM disabled / reinstate-ready).
+        # Cursor/VS Code editor module (commonBase shared; VS Code HM on when the cask is listed or programs.vscode.enable).
         vscode = import ./home/vscode.nix;
         zsh = import ./home/zsh.nix;
         editor = import ./home/editor.nix;
@@ -242,7 +329,12 @@
 
       devShells = overlayOutputs.devShells;
 
-      checks = overlayOutputs.checks;
+      # Starter-only checks (deliberately not part of overlayFlakeOutputs, so
+      # overlay repos do not inherit them): lib unit tests, treefmt, shellcheck
+      # and JSON schema validation of config/.
+      checks = overlayOutputs.checks // {
+        ${system} = overlayOutputs.checks.${system} // starterChecks;
+      };
 
       apps.${system} = overlayOutputs.apps.${system} // {
         validate-host-json = {

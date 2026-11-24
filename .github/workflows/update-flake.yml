@@ -1,4 +1,12 @@
-# Opens a PR after `nix flake update`. Requires one of:
+# Weekly refresh of flake inputs, manual pins, and editor tooling, delivered as a PR.
+#
+# Two jobs so the write token never reaches a step that runs the freshly bumped toolchain:
+#   - `update` (read-only token): runs Nix and repo scripts, builds the result, and hands
+#     over only an allowlisted set of changed files as an artifact.
+#   - `pr` (write token): Nix-free; validates the artifact, copies it into a clean checkout,
+#     and opens the pull request.
+#
+# Opening the PR requires one of:
 #   1. Repo Settings → Actions → General → Workflow permissions →
 #      "Allow GitHub Actions to create and approve pull requests", or
 #   2. A `WORKFLOW_PAT` repo secret (fine-grained PAT: contents + pull-requests write).
@@ -11,17 +19,29 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
+
+# Overlapping scheduled/manual runs must not race on the automation/flake-update branch.
+concurrency:
+  group: update-flake
+  cancel-in-progress: false
 
 jobs:
   update:
     runs-on: macos-latest
     timeout-minutes: 90
+    permissions:
+      contents: read
+    outputs:
+      pins: ${{ steps.pins.outcome }}
+      build: ${{ steps.build.outcome }}
+      changed: ${{ steps.stage.outputs.changed }}
     steps:
       - name: Checkout
         # actions/checkout@v7
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
 
       - name: Install Nix
         # DeterminateSystems/nix-installer-action@v22
@@ -29,6 +49,16 @@ jobs:
 
       - name: Update lock file
         run: nix flake update
+
+      # Refreshes AMO / Marketplace / catppuccin-bat / google-fonts / npm pins.
+      # A failure is recorded (job goes red at the end) but does not stop the PR.
+      - name: Refresh manual pins
+        id: pins
+        continue-on-error: true
+        env:
+          # Read-only token; the script only sends it to https://api.github.com/*.
+          GH_TOKEN: ${{ github.token }}
+        run: nix develop --command bash scripts/update-pins.sh all
 
       # Bumped prettier-config / eslint-config inputs invalidate the vendored
       # npm lockfile and npmDepsHash; regenerate both so the PR builds.
@@ -38,32 +68,204 @@ jobs:
       - name: Evaluate flake (no build)
         run: nix flake check --no-build --option warn-dirty false
 
+      # Verify in-workflow so the result is checked even when GITHUB_TOKEN-created
+      # PRs do not trigger CI.
+      - name: Build host + pinned sources
+        id: build
+        continue-on-error: true
+        # Keeps the step inside the job's 90-minute limit so a slow cold build fails the step instead of cancelling the job.
+        timeout-minutes: 60
+        run: |
+          nix build --no-link --option warn-dirty false \
+            .#checks.aarch64-darwin.example-mac \
+            .#checks.aarch64-darwin.pinned-sources
+
+      # Copy only allowlisted changed files to $RUNNER_TEMP/changes/<repo-relative-path>.
+      # BSD cp has no --parents, so use mkdir -p + cp.
+      - name: Stage changed files
+        id: stage
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/changes"
+          rm -rf "$out"
+          mkdir -p "$out"
+          # Write the list to a file first so a `git diff` failure aborts the step
+          # (a process substitution would hide it from `set -e`/`pipefail`).
+          list="$RUNNER_TEMP/changed-files.list"
+          git diff --name-only -z > "$list"
+          staged=0
+          skipped=0
+          while IFS= read -r -d '' f; do
+            case "$f" in
+              flake.lock | \
+                home/firefox/addons-pins.json | \
+                overlays/google-fonts/pins.json | \
+                home/vscode/extensions-extra.json | \
+                home/bat-theme-pin.json | \
+                lib/editor-tooling-package.json | \
+                lib/editor-tooling-package-lock.json | \
+                lib/editor-tooling.nix)
+                mkdir -p "$out/$(dirname "$f")"
+                cp "$f" "$out/$f"
+                staged=$((staged + 1))
+                ;;
+              *)
+                skipped=$((skipped + 1))
+                ;;
+            esac
+          done < "$list"
+          if [ "$skipped" -gt 0 ]; then
+            echo "::warning::$skipped changed file(s) outside the allowlist were not staged."
+          fi
+          if [ "$staged" -gt 0 ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload changed files
+        if: steps.stage.outputs.changed == 'true'
+        # actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: flake-update-changes
+          path: ${{ runner.temp }}/changes
+          if-no-files-found: error
+          retention-days: 1
+
+  # Holds the write token. No Nix and no repo scripts run here, and artifact file
+  # names/contents are never interpolated into `run:`.
+  pr:
+    needs: update
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        # actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Download changed files
+        if: needs.update.outputs.changed == 'true'
+        # actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: flake-update-changes
+          path: ${{ runner.temp }}/changes
+
+      # Reject anything but regular files at allowlisted repo-relative paths, then copy.
+      - name: Validate and apply changes
+        if: needs.update.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/changes"
+          if [ ! -d "$dir" ]; then
+            echo "::error::Artifact directory is missing."
+            exit 1
+          fi
+          # Anything that is neither a regular file nor a directory (symlink, device, ...).
+          if [ -n "$(find "$dir" -mindepth 1 ! -type f ! -type d -print -quit)" ]; then
+            echo "::error::Artifact contains non-regular files; refusing to apply."
+            exit 1
+          fi
+          is_allowed() {
+            case "$1" in
+              /* | .. | ../* | */.. | */../*)
+                return 1
+                ;;
+              flake.lock | \
+                home/firefox/addons-pins.json | \
+                overlays/google-fonts/pins.json | \
+                home/vscode/extensions-extra.json | \
+                home/bat-theme-pin.json | \
+                lib/editor-tooling-package.json | \
+                lib/editor-tooling-package-lock.json | \
+                lib/editor-tooling.nix)
+                return 0
+                ;;
+              *)
+                return 1
+                ;;
+            esac
+          }
+          # Validate everything first so nothing is applied partially.
+          count=0
+          while IFS= read -r -d '' path; do
+            rel="${path#"$dir"/}"
+            if ! is_allowed "$rel"; then
+              echo "::error::Artifact contains a path outside the allowlist; refusing to apply."
+              exit 1
+            fi
+            if [ -L "$rel" ]; then
+              echo "::error::Destination is a symlink; refusing to apply."
+              exit 1
+            fi
+            count=$((count + 1))
+          done < <(find "$dir" -type f -print0)
+          if [ "$count" -eq 0 ]; then
+            echo "::error::Artifact contains no files."
+            exit 1
+          fi
+          while IFS= read -r -d '' path; do
+            rel="${path#"$dir"/}"
+            mkdir -p "$(dirname "$rel")"
+            cp "$path" "$rel"
+          done < <(find "$dir" -type f -print0)
+
       - name: Open pull request
+        if: needs.update.outputs.changed == 'true'
         id: cpr
         # peter-evans/create-pull-request@v8
         uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1
         with:
           # PAT bypasses the "Actions may not create PRs" repo setting when set.
           token: ${{ secrets.WORKFLOW_PAT || github.token }}
-          commit-message: "chore: update flake inputs"
-          title: "chore: update flake inputs"
+          commit-message: "chore: update flake inputs and pins"
+          title: "chore: update flake inputs and pins"
           body: |
-            Automated `nix flake update` from the weekly workflow.
+            Automated weekly update: `nix flake update`, manual pins (`scripts/update-pins.sh all`), and the editor-tooling lock.
 
-            Review `flake.lock` diff and merge when CI passes (full host builds run on the PR via flake.yml).
+            Workflow outcomes: pins `${{ needs.update.outputs.pins }}`, host + pinned-sources build `${{ needs.update.outputs.build }}`. If either is `failure`, the workflow run is red; check its logs before merging.
+
+            Reviewer checklist:
+            - [ ] Review the `flake.lock` diff.
+            - [ ] Check the AMO and VSIX URLs in `home/firefox/addons-pins.json` and `home/vscode/extensions-extra.json` (AMO host and add-on, Marketplace version and hash).
+            - [ ] Check the `lib/editor-tooling.nix` diff touches only `npmDepsHash` (it is Nix code that gets evaluated).
+            - [ ] Check the workflow logs for `pins: npm: <pkg> <major> available` warnings (new eslint/prettier majors are not bumped automatically).
+            - [ ] Confirm the `Build host + pinned sources` step passed, then merge when CI passes (full host builds also run on the PR via flake.yml).
           branch: automation/flake-update
           delete-branch: true
           labels: dependencies
 
       - name: Report manual PR link when auto-create is blocked
-        if: steps.cpr.outcome == 'failure'
+        if: failure() && steps.cpr.outcome == 'failure'
         run: |
           {
             echo "::warning::GitHub Actions could not open a pull request."
             echo "Enable **Allow GitHub Actions to create and approve pull requests** at:"
-            echo "https://github.com/${{ github.repository }}/settings/actions"
+            echo "https://github.com/${GITHUB_REPOSITORY}/settings/actions"
             echo "Or add a \`WORKFLOW_PAT\` repository secret (contents + pull-requests write)."
             echo "The update branch was still pushed — open a PR manually:"
-            echo "https://github.com/${{ github.repository }}/compare/main...automation/flake-update?expand=1"
+            echo "https://github.com/${GITHUB_REPOSITORY}/compare/main...automation/flake-update?expand=1"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
+      # The PR still opens when pins or the build failed; keep the run red.
+      - name: Fail when pins or build failed
+        if: always() && (needs.update.outputs.pins == 'failure' || needs.update.outputs.build == 'failure')
+        env:
+          PINS_OUTCOME: ${{ needs.update.outputs.pins }}
+          BUILD_OUTCOME: ${{ needs.update.outputs.build }}
+        run: |
+          echo "::error::Weekly update finished with failures: pins=${PINS_OUTCOME}, build=${BUILD_OUTCOME}. Check the update job logs before merging the PR."
+          {
+            echo "### Weekly update failures"
+            echo ""
+            echo "- Refresh manual pins: \`${PINS_OUTCOME}\`"
+            echo "- Build host + pinned sources: \`${BUILD_OUTCOME}\`"
           } >> "$GITHUB_STEP_SUMMARY"
           exit 1

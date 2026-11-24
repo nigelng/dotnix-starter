@@ -127,9 +127,12 @@ let
     listed=$(cursor --list-extensions 2>/dev/null || true)
     for ext in ${lib.concatStringsSep " " cursorPinnedExtensions}; do
       if ! printf '%s\n' "$listed" | grep -qx "$ext"; then
-        cursor --install-extension "$ext" --force
+        if ! cursor --install-extension "$ext" --force; then
+          echo "warning: cursor: failed to install $ext; run 'cursor --install-extension $ext --force' later" >&2
+        fi
       fi
     done
+    exit 0
   '';
 
 in

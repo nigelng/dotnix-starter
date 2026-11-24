@@ -36,6 +36,7 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Guard — main branch only
         if: github.ref != 'refs/heads/main'
@@ -57,26 +58,31 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Install git-cliff
-        env:
-          GIT_CLIFF_VERSION: v2.7.0
+      - name: Install Nix
+        # DeterminateSystems/nix-installer-action@v22
+        uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa
+
+      - name: Resolve git-cliff from the flake devShell
+        # Resolve once so later steps call release-changelog.sh directly; a failing
+        # `nix develop` fails here instead of reading as false inside an `if` test.
         run: |
           set -euo pipefail
-          asset="git-cliff-${GIT_CLIFF_VERSION#v}-x86_64-unknown-linux-gnu.tar.gz"
-          base="https://github.com/orhun/git-cliff/releases/download/${GIT_CLIFF_VERSION}"
-          curl -fsSL "${base}/${asset}" -o "${asset}"
-          curl -fsSL "${base}/${asset}.sha512" -o "${asset}.sha512"
-          sha512sum -c "${asset}.sha512"
-          tar -xzf "${asset}"
-          install -m 0755 "git-cliff-${GIT_CLIFF_VERSION#v}/git-cliff" /usr/local/bin/git-cliff
-          git-cliff --version
+          bin="$(nix develop --command bash -c 'command -v git-cliff')"
+          if [[ "$bin" != /nix/store/* || ! -x "$bin" ]]; then
+            echo "::error::git-cliff did not resolve to a Nix store path: ${bin}"
+            exit 1
+          fi
+          "$bin" --version
+          echo "GIT_CLIFF_BIN=$bin" >> "$GITHUB_ENV"
 
       - name: Resolve release version
         id: version
+        env:
+          BUMP_INPUT: ${{ inputs.bump }}
         run: |
           set -euo pipefail
           prev="$(./scripts/release-changelog.sh --print-prev-tag)"
-          next="$(./scripts/release-changelog.sh --bump "$prev" "${{ inputs.bump }}")"
+          next="$(./scripts/release-changelog.sh --bump "$prev" "$BUMP_INPUT")"
           {
             echo "prev_tag=$prev"
             echo "next_tag=$next"
@@ -86,9 +92,10 @@ jobs:
         id: state
         env:
           RECOVER_INPUT: ${{ inputs.recover }}
+          NEXT_TAG: ${{ steps.version.outputs.next_tag }}
         run: |
           set -euo pipefail
-          tag="${{ steps.version.outputs.next_tag }}"
+          tag="$NEXT_TAG"
 
           recover=false
           case "${RECOVER_INPUT,,}" in
@@ -143,10 +150,13 @@ jobs:
 
       - name: Update CHANGELOG
         if: steps.state.outputs.orphan != 'true'
+        env:
+          PREV_TAG: ${{ steps.version.outputs.prev_tag }}
+          NEXT_TAG: ${{ steps.version.outputs.next_tag }}
         run: |
           set -euo pipefail
-          prev="${{ steps.version.outputs.prev_tag }}"
-          tag="${{ steps.version.outputs.next_tag }}"
+          prev="$PREV_TAG"
+          tag="$NEXT_TAG"
           ./scripts/release-changelog.sh --since "$prev" --version "$tag" --prepend > release-body.md
 
       - name: Open and merge release PR
@@ -216,9 +226,11 @@ jobs:
       - name: Resolve orphan release
         if: steps.state.outputs.orphan == 'true'
         id: recover
+        env:
+          NEXT_TAG: ${{ steps.version.outputs.next_tag }}
         run: |
           set -euo pipefail
-          tag="${{ steps.version.outputs.next_tag }}"
+          tag="$NEXT_TAG"
           ./scripts/release-changelog.sh --extract-section "$tag" > release-body.md
           if [[ ! -s release-body.md ]]; then
             echo "::error::Could not extract changelog section for ${tag}."

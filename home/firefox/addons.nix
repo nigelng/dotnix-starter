@@ -22,42 +22,10 @@ let
       fixedExtid = addonId;
     };
 
-  # Curated AMO add-on catalog keyed by slug.
-  # Update URLs and hashes when bumping versions (query the AMO API).
+  # Curated AMO add-on catalog keyed by slug, loaded from addons-pins.json.
+  # Bump URLs and hashes with scripts/update-pins.sh (queries the AMO API).
   # Policy install uses `url` as ExtensionSettings install_url (pinned file URL).
-  catalog = {
-    darkreader = {
-      name = "darkreader";
-      addonId = "addon@darkreader.org";
-      url = "https://addons.mozilla.org/firefox/downloads/file/4859299/darkreader-4.9.128.xpi";
-      hash = "sha256-Mb5p5eeD4w3CVe41fypyM0hvgBy6BhVg8aRN65YDKW8";
-    };
-    "onepassword-x-password-manager" = {
-      name = "onepassword-x-password-manager";
-      addonId = "{d634138d-c276-4fc8-924b-40a0ea21d284}";
-      url = "https://addons.mozilla.org/firefox/downloads/file/4853670/1password_x_password_manager-8.12.24.34.xpi";
-      hash = "sha256-Rqs4wTzm1HJ5S9uG7h4Q7CfrZO4xdXq4ph/ni4JrO9s";
-    };
-    "adguard-adblocker" = {
-      name = "adguard-adblocker";
-      addonId = "adguardadblocker@adguard.com";
-      url = "https://addons.mozilla.org/firefox/downloads/file/4805625/adguard_adblocker-5.4.3.1.xpi";
-      hash = "sha256-NKAzwTSD1Pif/0RP67xMNNdCqcUR6vscfthcwBhGF+c";
-    };
-    # Companion for AdGuard desktop app (replaces standalone AdBlocker when the app is installed).
-    "adguard-browser-assistant" = {
-      name = "adguard-browser-assistant";
-      addonId = "browserassistant@adguard.com";
-      url = "https://addons.mozilla.org/firefox/downloads/file/4549017/adguard_browser_assistant-1.4.8.xpi";
-      hash = "sha256-CRIjaZvgQKhLPHuL838bIeD4fnX9+jgKW0V2LB2sfVE=";
-    };
-    "privacy-badger17" = {
-      name = "privacy-badger17";
-      addonId = "jid1-MnnxcxisBPnSXQ@jetpack";
-      url = "https://addons.mozilla.org/firefox/downloads/file/5032646/privacy_badger17-2026.9.15.xpi";
-      hash = "sha256-l82JEeNIbaNKUyp8fygGzW0M+hF6H75eh0cEKpRELWI=";
-    };
-  };
+  catalog = lib.importJSON ./addons-pins.json;
 
   lookupSlug =
     slug:

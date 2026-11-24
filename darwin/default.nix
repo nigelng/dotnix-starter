@@ -83,19 +83,24 @@ lib.genAttrs hosts (
         };
         home-manager.users.${userConfig.user} = {
           # The home module tree always includes firefox.nix so the module
-          # options are available. Firefox is only enabled by default when the
-          # standalone flake has config/firefox/base.json. Overlay repos without
-          # Firefox config get the mkEnableOption default (false) and can opt in
-          # by setting my.firefox.enable = true in extraHomeModules.
+          # options are available. The default comes from a host's
+          # config/firefox/hosts/<host>.json "enable" (via loadFirefoxConfig)
+          # when present; otherwise Firefox defaults on when
+          # config/firefox/base.json exists. Overlay repos without Firefox
+          # config get the mkEnableOption default (false) and can opt in by
+          # setting my.firefox.enable = true in extraHomeModules, which also
+          # overrides this default.
           imports = [
             (import ../home)
             (import ../home/firefox.nix)
             (import ../home/android.nix)
           ]
           ++ extraHomeModules;
-          my.firefox.enable = lib.mkIf (builtins.pathExists "${flakeRoot}/config/firefox/base.json") (
-            lib.mkDefault true
-          );
+          my.firefox.enable =
+            if firefoxConfig ? enable then
+              lib.mkDefault firefoxConfig.enable
+            else
+              lib.mkIf (builtins.pathExists "${flakeRoot}/config/firefox/base.json") (lib.mkDefault true);
           my.android.enable = lib.mkDefault androidConfig.enable;
         };
       }

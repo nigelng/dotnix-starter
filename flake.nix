@@ -140,6 +140,64 @@
         '';
       };
 
+      # Eval-time assertion so `nix flake check --no-build` fails on a red test.
+      libTests = import ./tests/lib.nix { inherit lib; };
+
+      starterChecks = {
+        lib-tests =
+          assert lib.assertMsg (
+            libTests.results == [ ]
+          ) "tests/lib.nix failures: ${builtins.toJSON libTests.results}";
+          assert lib.assertMsg (
+            libTests.count >= 20
+          ) "tests/lib.nix ran only ${toString libTests.count} tests (expected >= 20)";
+          pkgs.runCommand "lib-tests" { } "touch $out";
+
+        fmt =
+          pkgs.runCommand "fmt-check"
+            {
+              nativeBuildInputs = [ pkgs.nixfmt-tree ];
+            }
+            ''
+              export HOME="$TMPDIR"
+              cp -r ${self} src
+              chmod -R u+w src
+              cd src
+              treefmt --ci --tree-root .
+              touch $out
+            '';
+
+        shellcheck =
+          pkgs.runCommand "shellcheck"
+            {
+              nativeBuildInputs = [ pkgs.shellcheck ];
+            }
+            ''
+              cd ${self}
+              shellcheck scripts/*.sh build-darwin.sh
+              touch $out
+            '';
+
+        json-schema =
+          pkgs.runCommand "json-schema"
+            {
+              nativeBuildInputs = [ validateHostJsonScript ];
+            }
+            ''
+              cp -r ${self} src
+              chmod -R u+w src
+              cd src
+              for s in host apps fonts firefox android hosts user git; do
+                test -f "config/schema/$s.schema.json" || {
+                  echo "missing config/schema/$s.schema.json" >&2
+                  exit 1
+                }
+              done
+              validate-host-json "$PWD"
+              touch $out
+            '';
+      };
+
       overlayOutputs = import ./lib/overlay-flake-outputs.nix {
         inherit
           self
@@ -242,7 +300,12 @@
 
       devShells = overlayOutputs.devShells;
 
-      checks = overlayOutputs.checks;
+      # Starter-only checks (deliberately not part of overlayFlakeOutputs, so
+      # overlay repos do not inherit them): lib unit tests, treefmt, shellcheck
+      # and JSON schema validation of config/.
+      checks = overlayOutputs.checks // {
+        ${system} = overlayOutputs.checks.${system} // starterChecks;
+      };
 
       apps.${system} = overlayOutputs.apps.${system} // {
         validate-host-json = {

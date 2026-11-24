@@ -56,7 +56,8 @@ Uppercase `G*` shortcuts come from zimfw's `git` module (`zmodule git` in `home/
 | Path                                   | Role                                                                                                                                                                                      |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `flake.nix`                            | Inputs, `darwinConfigurations`, `homeModules`, `darwinModules`, `formatter`, `devShell`, `checks`, `apps`                                                                                 |
-| `lib/`                                 | JSON loaders (`loadSharedConfig`, `loadHostConfig`, …)                                                                                                                                    |
+| `lib/`                                 | JSON loaders (`loadSharedConfig`, `loadHostConfig`, …) wrapping pure merge functions (`mergeAppConfig`, `resolveHostConfig`, …); see [docs/architecture/OVERVIEW.md](docs/architecture/OVERVIEW.md) |
+| `tests/lib.nix`                        | `lib.runTests` unit tests for the pure merge functions plus a schema-to-loader drift test (run by the `lib-tests` flake check)                                                            |
 | `config/apps/base.json`                | Apps on every host: `system`, `user`, `taps`, `brews`, `casks`, `mas`                                                                                                                     |
 | `config/apps/hosts/<name>.json`        | Per-host extras only (additive merge; lists deduplicated). Required for each host in `config/hosts.json`.                                                                                 |
 | `config/fonts/base.json`               | Fonts on every host: `pkgs`, `google`, `nerd` (optional `casks` per host in `config/fonts/hosts/<name>.json`)                                                                             |
@@ -65,11 +66,12 @@ Uppercase `G*` shortcuts come from zimfw's `git` module (`zmodule git` in `home/
 | `config/firefox/hosts/<name>.json`     | Per-host Firefox overrides (additive merge for extensions, per-key override for settings). Required for each host in `config/hosts.json`.                                                 |
 | `config/android/base.json`             | Shared Android SDK defaults (no `enable` key). Optional for overlays that omit Android.                                                                                                   |
 | `config/android/hosts/<name>.json`     | Per-host Android opt-in (`enable`) and overrides. Required when base exists.                                                                                                              |
-| `config/schema/*.schema.json`          | JSON Schema for hosts, apps, fonts, Firefox, Android (validated by `scripts/validate-host-json.sh`; override with `SCHEMA_ROOT`)                                                          |
+| `config/schema/*.schema.json`          | JSON Schema for `host`, `hosts`, `user`, `git`, `apps`, `fonts`, `firefox`, `android` (8 schemas; validated by `scripts/validate-host-json.sh`; override with `SCHEMA_ROOT`)               |
 | `config/user.json` / `config/git.json` | Shared profile (name, email, GPG) and git settings. Copy `config/user.json.example` to `config/user.json`, edit, and **git add** it (flakes only see tracked files). |
 | `config/hosts.json`                    | Hostnames to build (`hosts`, `defaultHost`)                                                                                                                                               |
 | `config/hosts/<name>.json`             | Per-machine settings: `adminUsername`, `machineType` (`laptop` \| `macmini`), Homebrew, nix trusted/allowed users, optional `extraSessionPaths`, `knownNetworkServices`, power / SoftwareUpdate overrides |
 | `docs/MACOS-27.md`                     | Major macOS / channel upgrade checklist                                                                                                                                                   |
+| `docs/architecture/OVERVIEW.md`        | Config pipeline (JSON → schema → loader → modules → assertions), knob defaults, check inventory, overlay contract                                                                         |
 | `docs/SECURITY.md`                     | Trust model, post-install checklist (FileVault/Gatekeeper), secrets, Homebrew, Firefox, CI pinning                                                                                        |
 | `overlays/google-fonts/`               | Nix overlay packaging fonts from [google/fonts](https://github.com/google/fonts)                                                                                                          |
 | `scripts/new-host.sh`                  | Interactive scaffold for a new host (also `nix run '.#new-host'`)                                                                                                                         |
@@ -184,6 +186,8 @@ nix fmt              # format *.nix (flake formatter = nixfmt-tree / treefmt)
 nix fmt -- --ci      # verify formatting (CI uses this; treefmt CI mode)
 nix run '.#check'    # runs nix flake check (may warn once if repo is dirty)
 nix flake check      # direct; use after committing for quiet output
+nix build --no-link '.#checks.aarch64-darwin.lib-tests'  # also: fmt, shellcheck, json-schema (see CI)
+bash scripts/test-correctness.sh schema   # schema/assertion regressions (also part of `all`)
 nix flake update     # bump input pins (commit flake.lock when intentional)
 nix run '.#changelog'           # nix-darwin stateVersion notes (defaultHost)
 nix run '.#changelog' -- example-mac  # same for a specific host
@@ -292,7 +296,7 @@ All settings are consumer-overridable via `my.firefox.settings` (Nix) or per-hos
 | Path                                | Role                                                                                                      |
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `config/firefox/base.json`          | Default profile name, `settings` (about:config prefs), and `extensions.nix` (AMO slugs)                   |
-| `config/firefox/hosts/<name>.json`  | Per-host overrides (additive merge for extension lists, per-key override for settings). Use `{}` if none. |
+| `config/firefox/hosts/<name>.json`  | Per-host overrides (additive merge for extension lists, per-key override for settings; optional `"enable"`, see below). Use `{}` if none. |
 | `config/schema/firefox.schema.json` | JSON Schema for the Firefox config (validated by `scripts/validate-host-json.sh`)                         |
 
 **How extensions are installed:**
@@ -300,6 +304,10 @@ All settings are consumer-overridable via `my.firefox.settings` (Nix) or per-hos
 By default (`my.firefox.extensionInstallMode = "policy"`), add-ons are installed via `programs.firefox.policies.ExtensionSettings` (`force_installed` + pinned AMO **file** URLs from the catalog / `manual` entries). home-manager writes these into Darwin defaults (`org.mozilla.firefox.plist`) so Homebrew Firefox applies them. First launch (or restart after switch) needs network so Firefox can fetch the XPIs. Extension auto-update prefs stay off — bump catalog/manual URLs intentionally to change versions (see [docs/SECURITY.md](docs/SECURITY.md)).
 
 Official Firefox builds ignore new profile-directory XPI sideloads, so the old `home.file` symlink path is not the default.
+
+**Enabling per host:**
+
+A host's `"enable"` in `config/firefox/hosts/<host>.json` (or in `base.json`; the host wins) sets the `my.firefox.enable` default (`lib.mkDefault`), so `"enable": false` turns home-manager Firefox off for that host and `"enable": true` turns it on. When neither file sets `enable`, Firefox defaults on if `config/firefox/base.json` exists. An explicit `my.firefox.enable` in a module still overrides the default.
 
 **Overriding in an overlay:**
 
@@ -323,7 +331,7 @@ home-manager.users.myuser = {
 
 **Adding non-AMO extensions:**
 
-Consumers can add custom XPI add-ons via `my.firefox.manualExtensions` (or the JSON `extensions.manual` array). Each entry requires `name`, `addonId`, `url`, and `hash` (SRI format; `hash` is required by schema and used if you opt into sideload mode):
+Consumers can add custom XPI add-ons via `my.firefox.manualExtensions` (or the JSON `extensions.manual` array). Each entry requires `name`, `addonId`, `url`, and `hash` (SRI format; `hash` is required by schema and used if you opt into sideload mode). `url` must be `https://`: `config/schema/firefox.schema.json` rejects other schemes and `home/firefox.nix` asserts the same for `my.firefox.manualExtensions` set from Nix. The rule covers only `extensions.manual` / `my.firefox.manualExtensions`; direct `programs.firefox.policies` settings (e.g. `ExtensionSettings.<id>.install_url`) and profile extensions set from other modules are not inspected. Example:
 
 ```nix
 my.firefox.manualExtensions = [
@@ -402,11 +410,11 @@ This template exposes `homeModules` and `darwinModules` as flake outputs so a pr
 | `darwinModules.default`          | Combined configuration.nix + system.nix                                                                                                                                   |
 | `darwinModules.configuration`    | Just the nix-darwin system config module                                                                                                                                  |
 | `darwinModules.system`           | Just the macOS defaults/networking module                                                                                                                                 |
-| `lib`                            | Config loaders (`loadHostsManifest`, `loadSharedConfig`, `loadUserConfig`, `loadAppConfig`, `loadHostConfig`, `loadRawHostConfig`, `loadFontConfig`, `loadFirefoxConfig`, `loadAndroidConfig`) |
+| `lib`                            | Config loaders (`loadHostsManifest`, `loadSharedConfig`, `loadUserConfig`, `loadAppConfig`, `loadHostConfig`, `loadRawHostConfig`, `loadFontConfig`, `loadFirefoxConfig`, `loadAndroidConfig`) and pure merge functions (`mergeAppConfig`, `mergeFontConfig`, `mergeFirefoxConfig`, `mergeAndroidConfig`, `resolveHostConfig`, `checkHostsManifest`) |
 | `editorTooling`                  | Built editor tooling attrset, or `{}` when inputs are absent                                                                                                              |
 | `mkWritableCopyActivation`       | Helper for writable-copy activation scripts (pass into `darwinConfigurationsBuilder`)                                                                                     |
 | `darwinConfigurationsBuilder`    | The `darwin/default.nix` function — call with your own config loaders, `extraHomeModules`, and `extraDarwinModules` (extra nix-darwin modules spliced into every host's `modules`; default `[ ]`) |
-| `overlayFlakeOutputs`            | Shared `apps` / `checks` / `formatter` / `devShell` helper used by this flake                                                                                              |
+| `overlayFlakeOutputs`            | Shared `apps` / `checks` / `formatter` / `devShell` helper used by this flake (the starter-only checks `lib-tests`, `fmt`, `shellcheck`, `json-schema` are not included)    |
 | `overlays.google-fonts`          | The google-fonts nixpkgs overlay                                                                                                                                          |
 | `pkgsForValidation`              | nixpkgs with google-fonts overlay for app/font validation (`allowUnfree = true`, matching darwin)                                                                         |
 | `validateApps`                   | App/font/Firefox-slug/Android JDK validation for overlay checks                                                                                                           |
@@ -518,6 +526,8 @@ SCHEMA_ROOT="$(nix build --print-out-paths --no-link '.#json-schemas')" \
 
 (When the flake root *is* this template, the default `SCHEMA_ROOT=$PWD/config/schema` is enough.)
 
+The validator checks `config/hosts.json` (against `hosts.schema.json` when present; `defaultHost`, when set, must be listed in `hosts` regardless), `config/user.json` (falling back to `config/user.json.example`; `user.schema.json`) and `config/git.json` (`git.schema.json`), then each host's `hosts/`, `apps/`, `fonts/`, `firefox/` and `android/` files. The `hosts`, `user` and `git` checks run only when that schema exists in `SCHEMA_ROOT` and the file exists, so an overlay pointing at an older schema directory keeps passing.
+
 **Manual overlay example (module-level):**
 
 For overlays that need full control over `darwinSystem` modules:
@@ -566,6 +576,17 @@ For overlays that need full control over `darwinSystem` modules:
 }
 ```
 
+### Overlay upgrade notes
+
+Intended behaviour changes for overlays that upgrade to this release:
+
+- **Unsafe user-list entries fail eval.** An entry in `trustedUsers`, `allowedUsers` or `adminUsername` containing `*`, whitespace or a newline is rejected by the schema and by a nix-darwin assertion on the final `nix.settings` `trusted-users`, `allowed-users`, `extra-trusted-users` and `extra-allowed-users`, including values from custom loaders or `extraDarwinModules`. Free-form `nix.extraOptions` is not inspected. `@group` entries (for example `@staff`) are still allowed.
+- **Firefox host `"enable": false` now takes effect.** It sets the `my.firefox.enable` default to `false`; previously the key was dropped by the loader.
+- **`defaultHost` must be one of `hosts`.** Otherwise `loadHostsManifest` throws and `scripts/validate-host-json.sh` fails.
+- **`config/user.json` needs `defaultGpgKey`** (alongside `name`, `email`, `defaultSigningKey`) to pass the exported validator; the modules already read these keys unguarded.
+- **`manual` Firefox add-on URLs must be `https://`** (schema and home-manager assertion on `my.firefox.manualExtensions` only; direct `programs.firefox.policies` settings are not inspected).
+- **New:** `claudeKit` is always defined (default `false`), and the pure merge functions are exported under `lib`.
+
 ---
 
 ## Maintenance
@@ -593,7 +614,9 @@ Optional keys in `config/hosts/<name>.json`:
 | `automaticallyInstallMacOSUpdates` | `true` | Set `false` before major macOS betas ([docs/MACOS-27.md](docs/MACOS-27.md)) |
 | `knownNetworkServices` | From preset | Override interface display names |
 | `extraSessionPaths` | `[]` | Extra PATH entries for the user session |
-| `claudeKit` | `false` | Enables the Claude/Cursor MCP + skills kit; starter ships the flag only — behavior lives in an overlay module |
+| `claudeKit` | `false` | Enables the Claude/Cursor MCP + skills kit; starter ships the flag only — behavior lives in an overlay module. Defined by the loader (`resolveHostConfig`), so overlay modules can read `systemConfig.claudeKit` without a fallback |
+
+`trustedUsers`, `allowedUsers` and `adminUsername` must not contain `*`, whitespace or a newline. The host schema rejects them, and `darwin/configuration.nix` asserts the same on the final `nix.settings` `trusted-users`, `allowed-users`, `extra-trusted-users` and `extra-allowed-users` (including values from overlay loaders and `extraDarwinModules`). Free-form `nix.extraOptions` is not inspected, so do not set user lists there. `@group` entries remain allowed. Firefox `extensions.manual[].url` / `my.firefox.manualExtensions` URLs must be `https://` (schema plus a home-manager assertion); direct `programs.firefox.policies` settings are not inspected.
 
 ### `machineType` (host presets)
 
@@ -688,8 +711,9 @@ Do not create a private/paid cache for this template — macos overlays should r
 
 GitHub Actions on `macos-14` (Apple Silicon; update the runner image when validating newer macOS — see [docs/MACOS-27.md](docs/MACOS-27.md)):
 
-- **Evaluate flake** — verifies every host in `config/hosts.json` has matching JSON under `config/hosts/`, `config/apps/hosts/`, `config/fonts/hosts/`, and (when present) Firefox/Android hosts; validates against `config/schema/*.schema.json`; then `nix flake check --no-build` (includes app/font package name and Firefox slug validation); then `scripts/test-correctness.sh all` (app fallbacks, GC schedule, Android lists/schema, Git includes and the 1Password signing gate, zsh init guards and baked `op` completion, `example-mac` host defaults, Cursor pinned-extension installer, install wrapper).
+- **Evaluate flake** — verifies every host in `config/hosts.json` has matching JSON under `config/hosts/`, `config/apps/hosts/`, `config/fonts/hosts/`, and (when present) Firefox/Android hosts; validates against `config/schema/*.schema.json`; then `nix flake check --no-build` (includes app/font package name and Firefox slug validation); then `nix build` of the starter-only checks `lib-tests`, `fmt`, `shellcheck` and `json-schema`; then `scripts/test-correctness.sh all` (app fallbacks, GC schedule, Android lists/schema, Git includes and the 1Password signing gate, zsh init guards and baked `op` completion, `example-mac` host defaults, the `schema` case (schema accept/reject, user-list and https assertions, Firefox `enable` wiring, validator `defaultHost` check), Cursor pinned-extension installer, install wrapper).
 - **Nix formatting** — dedicated job: `nix fmt -- --ci` (flake formatter is `pkgs.nixfmt-tree` / treefmt).
+- **Starter flake checks** (`flake.nix`, `checks.aarch64-darwin`; starter only, not part of `overlayFlakeOutputs`): `lib-tests` (`tests/lib.nix` merge-function tests and the schema-to-loader drift test), `fmt` (`treefmt --ci`), `shellcheck` (`scripts/*.sh`, `build-darwin.sh`) and `json-schema` (all eight schemas present, then `validate-host-json` on the tree). `nix flake check --no-build` evaluates them; the CI `eval` job builds them explicitly. Run one locally with `nix build --no-link '.#checks.aarch64-darwin.lib-tests'`.
 - **Per-host build** (`.github/workflows/flake.yml`) — matrix derived from `config/hosts.json`: builds `.#checks.aarch64-darwin.<host>`.
 - **shellcheck** — `scripts/*.sh` and `build-darwin.sh` on Ubuntu.
 - **Update flake inputs** (`.github/workflows/update-flake.yml`) — weekly (and manual) `nix flake update` with eval check and an automated PR; full host builds run on the PR via `flake.yml`.
@@ -704,8 +728,8 @@ Linux runners cannot build this flake; CI must stay on macOS.
 - **Apple Silicon only.** The flake hardcodes `system = "aarch64-darwin"` permanently. Intel Macs (`x86_64-darwin`) are out of scope.
 - Only brews/casks listed in the merged app and font configs are installed when `homebrewCleanup` is `uninstall` or `zap`; extras are removed on switch.
 - **mas** = Mac App Store apps (IDs in `config/apps/base.json` and/or `config/apps/hosts/<host>.json`). Find existing app IDs with [mas-cli](https://github.com/mas-cli/mas).
-- [Trusted users](https://nixos.org/manual/nix/stable/command-ref/conf-file.html#conf-trusted-users) are the current user plus any listed in the host JSON. Default: `[<username>]`. Never use `"*"`.
-- [Allowed users](https://nixos.org/manual/nix/stable/command-ref/conf-file.html#conf-allowed-users) are the current user plus config. Default for new hosts: `[adminUsername]`. Never use `"*"`.
+- [Trusted users](https://nixos.org/manual/nix/stable/command-ref/conf-file.html#conf-trusted-users) are the current user plus any listed in the host JSON. Default: `[<username>]`. Never use `"*"`; `*` and whitespace entries are rejected by the schema and a nix-darwin assertion.
+- [Allowed users](https://nixos.org/manual/nix/stable/command-ref/conf-file.html#conf-allowed-users) are the current user plus config. Default for new hosts: `[adminUsername]`. Never use `"*"` (same enforcement).
 - Guest login is disabled; Remote Login (`services.openssh`) is off; screensaver requires a password immediately. FileVault and Gatekeeper stay **out of band** — see [docs/SECURITY.md](docs/SECURITY.md).
 - `EDITOR=nvim` is the terminal default; `VISUAL` is `cursor` when `programs.cursor.enable`, else `code` when `programs.vscode.enable`, else `nvim`. `VISUAL` is forced in `home.sessionVariables` so it wins over neovim `defaultEditor`.
 - SSH `HashKnownHosts` is enabled in home-manager.

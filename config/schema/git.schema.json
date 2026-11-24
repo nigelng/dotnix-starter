@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nigelng/dotnix-starter/config/schema/git.schema.json",
+  "title": "Git config",
+  "description": "config/git.json: merged into home-manager programs.git, so additional keys are allowed.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "includes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "contents": { "type": "object" },
+          "condition": { "type": "string", "minLength": 1 }
+        },
+        "anyOf": [{ "required": ["path"] }, { "required": ["contents"] }]
+      },
+      "description": "Git include entries (programs.git.includes): each has a string path or an object contents, plus an optional string condition."
+    },
+    "ignores": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Global gitignore patterns."
+    }
+  }
+}

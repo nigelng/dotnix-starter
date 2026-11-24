@@ -33,6 +33,8 @@ nix-darwin does **not** manage disk encryption or Gatekeeper assessment policy. 
 - The macOS admin (`adminUsername`) is always a **trusted-user** (plus any names in host JSON `trustedUsers`).
 - Trusted users can add substituters / override trust boundaries without a password prompt.
 - Prefer empty `trustedUsers` and explicit `allowedUsers`. **Never** set `"*"` in either list.
+- **User-list rule:** no entry in `trustedUsers`, `allowedUsers` or `adminUsername` may contain `*`, whitespace or a newline (these are rendered unescaped into `nix.conf`, so a space or newline would inject extra users or settings). It is enforced twice: `config/schema/host.schema.json` rejects the entry in CI/`validate-host-json`, and `darwin/configuration.nix` asserts it over the **final** `nix.settings` `trusted-users`, `allowed-users`, `extra-trusted-users` and `extra-allowed-users` (including values set by overlay loaders or `extraDarwinModules`). Free-form `nix.extraOptions` is not inspected, so do not set user lists there.
+- `@group` entries (for example `@staff`) are still permitted and grant trust to every member of that group; list them deliberately.
 - CI uses the free public **`dotnix-starter`** [Cachix](https://www.cachix.org) substituter (see README). Add other substituters only when you trust the cache keys.
 
 ## Secrets
@@ -57,7 +59,7 @@ nix-darwin does **not** manage disk encryption or Gatekeeper assessment policy. 
 - The curated catalog may include optional AMO slugs beyond the default `extensions.nix` set (e.g. `adguard-browser-assistant` for AdGuard desktop users). Same pin/bump rules apply; overlays opt in via JSON slugs — do not ship conflicting AdGuard AdBlocker + Browser Assistant together.
 - **Trust gap vs Nix store:** policy install does **not** verify sha256 at `nix switch`. Mitigations: pin file URLs in git, keep `extensions.update.enabled` / `autoUpdateDefault` false, bump catalog/manual URLs intentionally for CVE fixes.
 - Do **not** duplicate starter `addonId`s in overlay `ExtensionSettings` — starter owns the force-installed list from JSON; overlays should use `extensions.nix` slugs or `manual` entries.
-- `extensions.manual` accepts arbitrary URL + hash — treat host JSON as trusted input (a malicious URL compromises the profile).
+- `extensions.manual` accepts an arbitrary URL + hash — treat host JSON as trusted input (a malicious URL compromises the profile). URLs must be `https://`: `config/schema/firefox.schema.json` rejects other schemes and `home/firefox.nix` asserts the same for `my.firefox.manualExtensions` set from Nix. The rule covers only `extensions.manual` / `my.firefox.manualExtensions`. Direct `programs.firefox.policies` settings (e.g. `ExtensionSettings.<id>.install_url`) and profile extensions set from other modules are not inspected. Don't add add-ons that way, or keep their URLs `https://` yourself.
 - Profile-dir XPI sideload (`extensionInstallMode = "sideload"`) is an undocumented escape hatch only; official/Homebrew Firefox builds typically ignore new sideloads.
 - DoH mode `2` falls back to system DNS; set `network.trr.mode` to `3` in `config/firefox/` for DoH-only.
 
@@ -72,6 +74,7 @@ nix-darwin does **not** manage disk encryption or Gatekeeper assessment policy. 
 
 - Workflows pin Actions by **commit SHA** (version in a comment). Dependabot still opens weekly bumps for `github-actions`.
 - `flake.yml` uses least-privilege `permissions: contents: read`.
+- Starter-only flake checks (`lib-tests`, `fmt`, `shellcheck`, `json-schema`) run in CI so schema and trust-rule regressions fail closed; see [architecture/OVERVIEW.md](architecture/OVERVIEW.md).
 - Eval/fmt/check jobs set up the free public **`dotnix-starter`** Cachix cache after nix-installer (`CACHIX_AUTH_TOKEN`). The step uses `continue-on-error` so missing cache/token soft-fails and jobs still proceed.
 - Release / update-flake workflows need write permissions (or `WORKFLOW_PAT`); scope the PAT tightly and review ruleset exemptions.
 

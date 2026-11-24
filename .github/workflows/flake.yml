@@ -60,6 +60,15 @@ jobs:
       - name: Evaluate flake (no build)
         run: nix flake check --no-build --option warn-dirty false
 
+      - name: Build starter checks
+        # nix flake check --no-build only evaluates; build the derivation checks
+        run: >-
+          nix build --no-link --option warn-dirty false
+          .#checks.aarch64-darwin.lib-tests
+          .#checks.aarch64-darwin.fmt
+          .#checks.aarch64-darwin.shellcheck
+          .#checks.aarch64-darwin.json-schema
+
       - name: Run correctness regressions
         # app fallbacks, weekly GC, Android lists/schema, Git includes + 1Password signing gate,
         # zsh init guards, example-mac host defaults, Cursor installer, install wrapper

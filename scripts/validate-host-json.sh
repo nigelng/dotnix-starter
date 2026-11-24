@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Validate host/apps/fonts/firefox/android JSON against SCHEMA_ROOT/*.schema.json.
+# Validate hosts/user/git (once) and per-host host/apps/fonts/firefox/android JSON
+# against SCHEMA_ROOT/*.schema.json. The hosts, user and git schemas are optional
+# so overlays pointing SCHEMA_ROOT at an older json-schemas store path still pass.
 # SCHEMA_ROOT defaults to $ROOT/config/schema (overlay repos can point at the
 # starter packages.<system>.json-schemas store path instead of copying schemas).
 # Run from the repo root, or pass the repo root as $1.
@@ -135,6 +137,32 @@ validate_android() {
     validate_with_python "$android_schema" "$path"
   done
 }
+
+# Mirrors the Nix loader check (checkHostsManifest); runs even without hosts.schema.json.
+# A present defaultHost (including null) must be a string listed in hosts.
+if ! jq -e '(has("defaultHost") | not) or (.defaultHost as $d | ($d | type) == "string" and any(.hosts[]?; . == $d))' "$manifest" >/dev/null; then
+  echo "$manifest: defaultHost $(jq -c '.defaultHost' "$manifest") is not listed in hosts (must be a host name string)" >&2
+  exit 1
+fi
+
+if [[ -f "$SCHEMA_ROOT/hosts.schema.json" ]]; then
+  validate_with_python "$SCHEMA_ROOT/hosts.schema.json" "$manifest"
+fi
+
+if [[ -f "$SCHEMA_ROOT/user.schema.json" ]]; then
+  for user_json in "config/user.json" "config/user.json.example"; do
+    if [[ -f "$user_json" ]]; then
+      jq -e . "$user_json" >/dev/null
+      validate_with_python "$SCHEMA_ROOT/user.schema.json" "$user_json"
+      break
+    fi
+  done
+fi
+
+if [[ -f "$SCHEMA_ROOT/git.schema.json" && -f "config/git.json" ]]; then
+  jq -e . "config/git.json" >/dev/null
+  validate_with_python "$SCHEMA_ROOT/git.schema.json" "config/git.json"
+fi
 
 for host in "${hosts[@]}"; do
   for path in \

@@ -1,6 +1,7 @@
 {
   pkgs,
   appConfig,
+  config,
   fontConfig,
   systemConfig,
   userConfig,
@@ -36,6 +37,7 @@ in
 
     settings = {
       # adminUsername is always trusted; trustedUsers adds extras. Never add "*".
+      # The assertions below reject unsafe entries in the final merged lists.
       trusted-users = [ userConfig.user ] ++ systemConfig.trustedUsers;
       allowed-users = [ userConfig.user ] ++ systemConfig.allowedUsers;
       auto-optimise-store = true;
@@ -57,6 +59,32 @@ in
       options = "--delete-older-than 14d";
     };
   };
+
+  # Checks the final nix.settings trusted-users, allowed-users, extra-trusted-users and extra-allowed-users,
+  # so values from overlay loaders and extra darwin modules are included. Free-form nix.extraOptions is not inspected.
+  assertions =
+    let
+      unsafe =
+        u:
+        lib.any (c: lib.hasInfix c u) [
+          "*"
+          " "
+          "\t"
+          "\n"
+          "\r"
+        ];
+      check = name: users: {
+        assertion = !(lib.any unsafe users);
+        message = "nix.settings.${name} contains unsafe entries ${builtins.toJSON (lib.filter unsafe users)}: entries must not contain \"*\" or whitespace (check trustedUsers/allowedUsers/adminUsername in config/hosts/<host>.json and any extra darwin modules).";
+      };
+    in
+    [
+      (check "trusted-users" config.nix.settings.trusted-users)
+      (check "allowed-users" config.nix.settings.allowed-users)
+      # Nix also honours the extra-* variants (freeform nix.settings); a bare string is wrapped and is unsafe if it holds "*" or whitespace.
+      (check "extra-trusted-users" (lib.toList (config.nix.settings.extra-trusted-users or [ ])))
+      (check "extra-allowed-users" (lib.toList (config.nix.settings.extra-allowed-users or [ ])))
+    ];
 
   environment = {
     systemPackages = systemApps;

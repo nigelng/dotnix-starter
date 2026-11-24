@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Focused regression checks for default-install and JSON-config correctness.
 #
-# Usage: scripts/test-correctness.sh [apps|gc|android|git|shell|host|cursor|wrapper|all]
+# Usage: scripts/test-correctness.sh [apps|gc|android|git|shell|host|schema|cursor|wrapper|all]
 #   (default: all). Run from anywhere; the repo root is derived from this file.
 #
 # Tools (nix, jq, python3 jsonschema) are only required by the cases that use
@@ -529,12 +529,14 @@ test_android_loader() {
   test_android_forbidden_enable
 }
 
-# schema_check LABEL valid|invalid JSON
+# schema_check SCHEMA LABEL valid|invalid JSON
+# SCHEMA is the file stem under config/schema (android -> android.schema.json).
 schema_check() {
+  local schema="$1" label="$2" want="$3" doc="$4"
   local file="$TMP/schema/$((CHECKS + 1)).json" rc=0
   mkdir -p "$TMP/schema"
-  printf '%s\n' "$3" >"$file"
-  python3 - "$ROOT/config/schema/android.schema.json" "$file" <<'PY' || rc=$?
+  printf '%s\n' "$doc" >"$file"
+  python3 - "$ROOT/config/schema/$schema.schema.json" "$file" <<'PY' || rc=$?
 import json
 import sys
 
@@ -548,30 +550,30 @@ with open(sys.argv[2]) as f:
 sys.exit(4 if list(Draft202012Validator(schema).iter_errors(data)) else 0)
 PY
   if [ "$rc" != 0 ] && [ "$rc" != 4 ]; then
-    die "schema validation harness error (status $rc) for: $3"
+    die "schema validation harness error (status $rc) for $schema: $doc"
   fi
-  if [ "$2" = valid ] && [ "$rc" = 0 ]; then
-    pass "schema: accepts $1"
-  elif [ "$2" = invalid ] && [ "$rc" != 0 ]; then
-    pass "schema: rejects $1"
+  if [ "$want" = valid ] && [ "$rc" = 0 ]; then
+    pass "schema: accepts $label"
+  elif [ "$want" = invalid ] && [ "$rc" != 0 ]; then
+    pass "schema: rejects $label"
   else
-    fail "schema: should $([ "$2" = valid ] && echo accept || echo reject) $1" "document: $3"
+    fail "schema: should $([ "$want" = valid ] && echo accept || echo reject) $label" "document: $doc"
   fi
 }
 
 test_android_schema() {
   python3 -c 'import jsonschema' 2>/dev/null || die "python jsonschema is required (run inside 'nix develop')"
-  schema_check "lists of strings" valid "$(jq -c '. + {"enable": true}' <<<"$ANDROID_BASE_LISTS")"
-  schema_check "explicit empty lists" valid '{"platformVersions":[],"systemImageTypes":[],"abiVersions":[]}'
-  schema_check "existing scalar keys" valid \
+  schema_check android "lists of strings" valid "$(jq -c '. + {"enable": true}' <<<"$ANDROID_BASE_LISTS")"
+  schema_check android "explicit empty lists" valid '{"platformVersions":[],"systemImageTypes":[],"abiVersions":[]}'
+  schema_check android "existing scalar keys" valid \
     '{"enable":true,"avdHome":"/x","guiSdkSymlink":true,"avdDefaultSymlink":false,"jdkPackage":"jdk17"}'
-  schema_check "the shipped base.json" valid "$(cat "$ROOT/config/android/base.json")"
-  schema_check "an unknown key (typo)" invalid '{"platformVersion":["34"]}'
-  schema_check "a string where a list is expected" invalid '{"platformVersions":"34"}'
-  schema_check "an object where a list is expected" invalid '{"systemImageTypes":{"a":1}}'
-  schema_check "a number where a list is expected" invalid '{"abiVersions":5}'
-  schema_check "a non-string platformVersions element" invalid '{"platformVersions":[34]}'
-  schema_check "a null abiVersions element" invalid '{"abiVersions":["arm64-v8a",null]}'
+  schema_check android "the shipped base.json" valid "$(cat "$ROOT/config/android/base.json")"
+  schema_check android "an unknown key (typo)" invalid '{"platformVersion":["34"]}'
+  schema_check android "a string where a list is expected" invalid '{"platformVersions":"34"}'
+  schema_check android "an object where a list is expected" invalid '{"systemImageTypes":{"a":1}}'
+  schema_check android "a number where a list is expected" invalid '{"abiVersions":5}'
+  schema_check android "a non-string platformVersions element" invalid '{"platformVersions":[34]}'
+  schema_check android "a null abiVersions element" invalid '{"abiVersions":["arm64-v8a",null]}'
 }
 
 test_android() {
@@ -1060,6 +1062,241 @@ test_host() {
   check_host_versions "$EVAL_OUT"
 }
 
+# --- case: schema ----------------------------------------------------------------
+
+# Config hardening: the JSON schemas (shipped files accepted, unsafe values
+# rejected), scripts/validate-host-json.sh on a temp copy, and the Nix-side
+# assertions that back the schemas up (final nix.settings user lists, https-only
+# manual Firefox add-ons, my.firefox.enable from a loader's `enable`).
+
+test_schema_files() {
+  local example host_json
+  example="$ROOT/config/hosts/$(default_host).json"
+  host_json="$(jq -c . "$example")"
+  schema_check host "the shipped example host" valid "$host_json"
+  schema_check host "a plain user list" valid "$(jq -c '.trustedUsers = ["alice"]' <<<"$host_json")"
+  schema_check host 'trustedUsers ["*"]' invalid "$(jq -c '.trustedUsers = ["*"]' <<<"$host_json")"
+  schema_check host 'trustedUsers ["alice *"]' invalid "$(jq -c '.trustedUsers = ["alice *"]' <<<"$host_json")"
+  schema_check host "a trustedUsers entry containing a newline" invalid \
+    "$(jq -c --arg u $'a\nb' '.trustedUsers = [$u]' <<<"$host_json")"
+  schema_check host 'allowedUsers ["*"]' invalid "$(jq -c '.allowedUsers = ["*"]' <<<"$host_json")"
+  schema_check host 'allowedUsers ["alice *"]' invalid "$(jq -c '.allowedUsers = ["alice *"]' <<<"$host_json")"
+  schema_check host "an allowedUsers entry containing a newline" invalid \
+    "$(jq -c --arg u $'a\nb' '.allowedUsers = [$u]' <<<"$host_json")"
+  schema_check host 'adminUsername "a *"' invalid "$(jq -c '.adminUsername = "a *"' <<<"$host_json")"
+  schema_check host 'a tab in trustedUsers' invalid "$(jq -c --arg u $'a\tb' '.trustedUsers = [$u]' <<<"$host_json")"
+  schema_check host 'a carriage return in allowedUsers' invalid \
+    "$(jq -c --arg u $'a\rb' '.allowedUsers = [$u]' <<<"$host_json")"
+  schema_check host 'an empty "" trustedUsers entry' invalid "$(jq -c '.trustedUsers = [""]' <<<"$host_json")"
+  schema_check host 'an empty "" allowedUsers entry' invalid "$(jq -c '.allowedUsers = [""]' <<<"$host_json")"
+  schema_check host 'an empty "" adminUsername' invalid "$(jq -c '.adminUsername = ""' <<<"$host_json")"
+  schema_check host '@staff group entries' valid \
+    "$(jq -c '.trustedUsers = ["@staff"] | .allowedUsers = ["@staff"]' <<<"$host_json")"
+
+  schema_check hosts "the shipped hosts.json" valid "$(jq -c . "$ROOT/config/hosts.json")"
+  schema_check hosts "an empty hosts list" invalid '{"hosts":[]}'
+  schema_check hosts "duplicate hosts" invalid '{"hosts":["a","a"]}'
+
+  local user_json
+  user_json="$(jq -c . "$ROOT/config/user.json.example")"
+  schema_check user "the shipped user.json.example" valid "$user_json"
+  schema_check user "a user.json with an extra key" valid "$(jq -c '.extra = "x"' <<<"$user_json")"
+  schema_check user "a user.json without defaultGpgKey" invalid "$(jq -c 'del(.defaultGpgKey)' <<<"$user_json")"
+  schema_check user "a user.json without defaultSigningKey" invalid "$(jq -c 'del(.defaultSigningKey)' <<<"$user_json")"
+  schema_check user 'an empty "" user name' invalid "$(jq -c '.name = ""' <<<"$user_json")"
+  schema_check user "a non-string email" invalid "$(jq -c '.email = 5' <<<"$user_json")"
+
+  schema_check git "the shipped git.json" valid "$(jq -c . "$ROOT/config/git.json")"
+  schema_check git "an extra programs.git key" valid '{"lfs":{"enable":true}}'
+  schema_check git "an include with a path and condition" valid '{"includes":[{"path":"~/.gitconfig.work","condition":"gitdir:~/work/"}]}'
+  schema_check git "an include with neither path nor contents" invalid '{"includes":[{"condition":"gitdir:~/work/"}]}'
+  schema_check git "includes that is not a list" invalid '{"includes":{"path":"x"}}'
+  schema_check git "a non-string ignores entry" invalid '{"ignores":[5]}'
+  schema_check git 'an empty "" ignores entry' invalid '{"ignores":[""]}'
+
+  schema_check firefox "the shipped firefox base.json" valid "$(jq -c . "$ROOT/config/firefox/base.json")"
+  schema_check firefox "an http:// manual add-on url" invalid "$(jq -c '.extensions.manual = [{name: "x", addonId: "x@x", url: "http://e.com/x.xpi", hash: "sha256-AAAA"}]' "$ROOT/config/firefox/base.json")"
+  schema_check firefox "an https:// manual add-on url" valid "$(jq -c '.extensions.manual = [{name: "x", addonId: "x@x", url: "https://e.com/x.xpi", hash: "sha256-AAAA"}]' "$ROOT/config/firefox/base.json")"
+}
+
+# validate-host-json.sh runs on a copy of config/ and scripts/ so the real tree is
+# never touched; it takes the repo root as $1.
+test_schema_validator() {
+  local copy="$TMP/validator"
+  mkdir -p "$copy"
+  cp -R "$ROOT/config" "$ROOT/scripts" "$copy/"
+  run_eval bash "$copy/scripts/validate-host-json.sh" "$copy"
+  check_eq "validator: accepts the shipped config" 0 "$EVAL_RC"
+  jq '.defaultHost = "not-a-host"' "$ROOT/config/hosts.json" >"$copy/config/hosts.json"
+  run_eval bash "$copy/scripts/validate-host-json.sh" "$copy"
+  if [ "$EVAL_RC" = 0 ]; then
+    fail "validator: rejects a defaultHost that is not in hosts" "exited 0"
+  else
+    pass "validator: rejects a defaultHost that is not in hosts"
+  fi
+  check_contains "validator: names the defaultHost problem" "$EVAL_ERR" "not listed in hosts"
+
+  # An older SCHEMA_ROOT without the hosts/user/git schemas must keep working,
+  # and the hosts manifest check must still run without hosts.schema.json.
+  local older="$TMP/older-schemas" name
+  mkdir -p "$older"
+  for name in host apps fonts firefox android; do
+    cp "$ROOT/config/schema/$name.schema.json" "$older/"
+  done
+  cp "$ROOT/config/hosts.json" "$copy/config/hosts.json"
+  SCHEMA_ROOT="$older" run_eval bash "$copy/scripts/validate-host-json.sh" "$copy"
+  check_eq "validator: an older SCHEMA_ROOT without hosts/user/git schemas accepts the shipped config" 0 "$EVAL_RC"
+  jq '.defaultHost = "not-a-host"' "$ROOT/config/hosts.json" >"$copy/config/hosts.json"
+  SCHEMA_ROOT="$older" run_eval bash "$copy/scripts/validate-host-json.sh" "$copy"
+  if [ "$EVAL_RC" = 0 ]; then
+    fail "validator: an older SCHEMA_ROOT still rejects a defaultHost that is not in hosts" "exited 0"
+  else
+    pass "validator: an older SCHEMA_ROOT still rejects a defaultHost that is not in hosts"
+  fi
+  check_contains "validator: an older SCHEMA_ROOT names the defaultHost problem" "$EVAL_ERR" "not listed in hosts"
+
+  # Like checkHostsManifest, a present but null or non-string defaultHost is
+  # rejected (older SCHEMA_ROOT, so the jq check alone must catch it).
+  local bad label
+  for bad in null "[\"$(default_host)\"]"; do
+    label="validator: rejects \"defaultHost\": $bad"
+    jq --argjson d "$bad" '.defaultHost = $d' "$ROOT/config/hosts.json" >"$copy/config/hosts.json"
+    SCHEMA_ROOT="$older" run_eval bash "$copy/scripts/validate-host-json.sh" "$copy"
+    if [ "$EVAL_RC" = 0 ]; then
+      fail "$label" "exited 0"
+    else
+      pass "$label"
+    fi
+    check_contains "$label names the defaultHost problem" "$EVAL_ERR" "not listed in hosts"
+  done
+  cp "$ROOT/config/hosts.json" "$copy/config/hosts.json"
+}
+
+# Probes (each `{ value = ...; }`, see eval_shapes): the failing assertion
+# messages of the shipped host and of extendModules variants, plus
+# my.firefox.enable for the shipped host and for a builder call whose firefox
+# loader sets enable = false. Nothing is built. T_HOST is the default host and
+# T_USER its adminUsername.
+nix_schema_expr() {
+  cat <<'NIX'
+let
+  rootDir = builtins.getEnv "T_ROOT";
+  user = builtins.getEnv "T_USER";
+  flake = builtins.getFlake "git+file://${rootDir}";
+  inherit (flake.inputs.nixpkgs) lib;
+  flakeRoot = builtins.toString flake.outPath;
+  hostName = builtins.getEnv "T_HOST";
+  host = flake.darwinConfigurations.${hostName};
+  sc = flake.lib.loadHostConfig flakeRoot hostName;
+  failing = sys: map (a: a.message) (builtins.filter (a: !a.assertion) sys.config.assertions);
+  withSystemConfig = extra: host.extendModules { specialArgs.systemConfig = sc // extra; };
+  withModule = module: host.extendModules { modules = [ module ]; };
+  firefoxEnable = sys: sys.config.home-manager.users.${user}.my.firefox.enable;
+
+  # The same arguments flake.nix passes, except the firefox loader.
+  builderHosts = flake.darwinConfigurationsBuilder {
+    inherit lib flakeRoot;
+    inherit (flake.inputs) home-manager darwin;
+    # flake.nix hard-codes this system as well.
+    system = "aarch64-darwin";
+    gitConfig = (flake.lib.loadSharedConfig flakeRoot).gitConfig;
+    inherit (flake) editorTooling mkWritableCopyActivation;
+    hosts = [ hostName ];
+    loadHostConfig = flake.lib.loadHostConfig flakeRoot;
+    loadAppConfig = flake.lib.loadAppConfig flakeRoot;
+    loadFontConfig = flake.lib.loadFontConfig flakeRoot;
+    loadFirefoxConfig =
+      _: flake.lib.mergeFirefoxConfig (lib.importJSON (flakeRoot + "/config/firefox/base.json")) { enable = false; };
+    loadAndroidConfig = flake.lib.loadAndroidConfig flakeRoot;
+    loadUserConfig = flake.lib.loadUserConfig flakeRoot { allowExample = true; };
+  };
+in
+{
+  baseline.value = failing host;
+  trusted.value = failing (withSystemConfig { trustedUsers = [ "*" ]; });
+  allowed.value = failing (withSystemConfig { allowedUsers = [ "*" ]; });
+  newline.value = failing (withSystemConfig { trustedUsers = [ "a\nb" ]; });
+  tab.value = failing (withSystemConfig { trustedUsers = [ "a\tb" ]; });
+  carriageReturn.value = failing (withSystemConfig { allowedUsers = [ "a\rb" ]; });
+  group.value = failing (withSystemConfig {
+    trustedUsers = [ "@staff" ];
+    allowedUsers = [ "@staff" ];
+  });
+  module.value = failing (withModule { nix.settings.trusted-users = [ "*" ]; });
+  moduleExtraTrusted.value = failing (withModule { nix.settings.extra-trusted-users = [ "*" ]; });
+  moduleExtraAllowed.value = failing (withModule { nix.settings.extra-allowed-users = [ "*" ]; });
+  http.value = failing (withModule {
+    home-manager.users.${user}.my.firefox.manualExtensions = [
+      {
+        name = "x";
+        addonId = "x@x";
+        url = "http://e.com/x.xpi";
+        hash = "sha256-AAAA";
+      }
+    ];
+  });
+  firefoxDefault.value = firefoxEnable host;
+  firefoxDisabled.value = firefoxEnable builderHosts.${hostName};
+}
+NIX
+}
+
+# check_assertion LABEL RESULTS_JSON PROBE NEEDLE: the probe has at least one
+# failing assertion and its messages mention NEEDLE.
+check_assertion() {
+  local msgs
+  shape_ok "$1" "$2" "$SHAPES_EXPR" "$3" || return 0
+  msgs="$(jq -r --arg n "$3" '.[$n].value | join("\n")' <<<"$2")"
+  if [ -z "$msgs" ]; then
+    fail "$1" "no failing assertion"
+    return 0
+  fi
+  check_contains "$1" "$msgs" "$4"
+}
+
+check_schema_eval() { # results-json
+  if shape_ok "schema/baseline" "$1" "$SHAPES_EXPR" baseline; then
+    check_eq "schema: the shipped host has no failing assertions" '[]' "$(jq -c '.baseline.value' <<<"$1")"
+  fi
+  check_assertion 'schema: trustedUsers ["*"] fails an assertion naming trusted-users' "$1" trusted trusted-users
+  check_assertion 'schema: allowedUsers ["*"] fails an assertion naming allowed-users' "$1" allowed allowed-users
+  check_assertion "schema: a newline in a user entry fails an assertion naming trusted-users" "$1" newline trusted-users
+  check_assertion "schema: a tab in a user entry fails an assertion naming trusted-users" "$1" tab trusted-users
+  check_assertion "schema: a carriage return in a user entry fails an assertion naming allowed-users" "$1" carriageReturn allowed-users
+  if shape_ok "schema/group" "$1" "$SHAPES_EXPR" group; then
+    check_eq 'schema: @staff group entries pass the user-list assertion' '[]' "$(jq -c '.group.value' <<<"$1")"
+  fi
+  check_assertion 'schema: nix.settings.trusted-users from a module ["*"] fails an assertion' "$1" module trusted-users
+  check_assertion 'schema: nix.settings.extra-trusted-users from a module ["*"] fails an assertion' "$1" moduleExtraTrusted extra-trusted-users
+  check_assertion 'schema: nix.settings.extra-allowed-users from a module ["*"] fails an assertion' "$1" moduleExtraAllowed extra-allowed-users
+  check_assertion "schema: an http:// manual add-on fails an assertion naming https://" "$1" http "https://"
+  if shape_ok "schema/firefoxDefault" "$1" "$SHAPES_EXPR" firefoxDefault; then
+    check_eq "schema: my.firefox.enable is true for the shipped host" true "$(jq -c '.firefoxDefault.value' <<<"$1")"
+  fi
+  if shape_ok "schema/firefoxDisabled" "$1" "$SHAPES_EXPR" firefoxDisabled; then
+    check_eq "schema: a loader's enable = false turns my.firefox.enable off" false "$(jq -c '.firefoxDisabled.value' <<<"$1")"
+  fi
+}
+
+test_schema() {
+  need_tools nix jq python3
+  python3 -c 'import jsonschema' 2>/dev/null || die "python jsonschema is required (run inside 'nix develop')"
+  init_tmp
+  test_schema_files
+  test_schema_validator
+  export T_ROOT="$ROOT"
+  T_HOST="$(default_host)"
+  T_USER="$(jq -r '.adminUsername' "$ROOT/config/hosts/$T_HOST.json")"
+  export T_HOST T_USER
+  SHAPES_EXPR="$(nix_schema_expr)"
+  eval_shapes "$SHAPES_EXPR"
+  if [ "$EVAL_RC" != 0 ]; then
+    fail "schema: evaluate the host assertions" "$EVAL_ERR"
+    return 0
+  fi
+  check_schema_eval "$EVAL_OUT"
+}
+
 # --- case: cursor ----------------------------------------------------------------
 
 CURSOR_EXTENSIONS="jnoortheen.nix-ide ms-python.vscode-python-envs ms-python.vscode-pylance"
@@ -1156,7 +1393,7 @@ test_cursor() {
 # --- entry point ----------------------------------------------------------------
 
 usage() {
-  echo "usage: ${0##*/} [apps|gc|android|git|shell|host|cursor|wrapper|all]"
+  echo "usage: ${0##*/} [apps|gc|android|git|shell|host|schema|cursor|wrapper|all]"
 }
 
 summary() {
@@ -1172,6 +1409,7 @@ main() {
     git) test_git ;;
     shell) test_shell ;;
     host) test_host ;;
+    schema) test_schema ;;
     cursor) test_cursor ;;
     wrapper) test_wrapper ;;
     all)
@@ -1182,6 +1420,7 @@ main() {
       test_git
       test_shell
       test_host
+      test_schema
       test_cursor
       ;;
     -h | --help)

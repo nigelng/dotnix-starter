@@ -1397,13 +1397,15 @@ check_bump() { # label expected tag type
   check_eq "release: $1" "$2" "$("$ROOT/scripts/release-changelog.sh" --bump "$3" "$4")"
 }
 
-check_bump_rejected() { # label tag type
+check_bump_rejected() { # label tag type expected-stderr-fragment
   local out rc=0
-  out="$("$ROOT/scripts/release-changelog.sh" --bump "$2" "$3" 2>&1)" || rc=$?
-  if [ "$rc" -ne 0 ]; then
-    pass "release: $1"
+  out="$("$ROOT/scripts/release-changelog.sh" --bump "$2" "$3" 2>&1 >/dev/null)" || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    fail "release: $1" "expected non-zero exit, got 0" "stderr: $out"
+  elif [[ "$out" != *"$4"* ]]; then
+    fail "release: $1" "expected stderr to contain: $4" "stderr: $out"
   else
-    fail "release: $1" "expected non-zero exit, got 0" "output: $out"
+    pass "release: $1"
   fi
 }
 
@@ -1412,11 +1414,11 @@ test_release() {
   check_bump "minor bump resets patch" v1.3.0 v1.2.3 minor
   check_bump "major bump resets minor and patch" v2.0.0 v1.2.3 major
   check_bump "tag without v prefix is accepted" v1.2.4 1.2.3 patch
-  check_bump_rejected "two-part version is rejected" v1.2 patch
-  check_bump_rejected "pre-release suffix is rejected" v1.2.3-rc1 patch
-  check_bump_rejected "shell metacharacters are rejected" 'v1.2.3;id' patch
-  check_bump_rejected "empty tag is rejected" "" patch
-  check_bump_rejected "unknown bump type is rejected" v1.2.3 foo
+  check_bump_rejected "two-part version is rejected" v1.2 patch "Invalid semver"
+  check_bump_rejected "pre-release suffix is rejected" v1.2.3-rc1 patch "Invalid semver"
+  check_bump_rejected "shell metacharacters are rejected" 'v1.2.3;id' patch "Invalid semver"
+  check_bump_rejected "empty tag is rejected by the --bump arg guard" "" patch "requires a tag"
+  check_bump_rejected "unknown bump type is rejected" v1.2.3 foo "Invalid bump type"
 }
 
 # --- entry point ----------------------------------------------------------------

@@ -66,14 +66,19 @@ nix-darwin does **not** manage disk encryption or Gatekeeper assessment policy. 
 ## Editors
 
 - Cursor (and optional Devin) default `security.workspace.trust.untrustedFiles` is `"prompt"`.
-- Shared extension set is `commonBase` in `home/vscode/extensions.nix` (Cursor HM; VS Code HM disabled but reinstate-ready). Devin optionally shares the **settings** pipeline only, not extension installs.
-- `commonBase` is free (Git Graph removed and not installed). `nixpkgs.config.allowUnfree = true` remains required for `_1password-cli`, Google Android SDK (`androidenv`), and editor/VS Code ecosystem packages that overlays or reinstated VS Code HM may pull in. Predicate allowlists proved too brittle as new unfree attrs appear.
+- Shared extension set is `commonBase` in `home/vscode/extensions.nix`, used by both Cursor HM and VS Code HM. VS Code HM is enabled when the `visual-studio-code` cask is listed or `programs.vscode.enable = true`. Devin optionally shares the **settings** pipeline only, not extension installs.
+- `commonBase` is free (Git Graph removed and not installed). `nixpkgs.config.allowUnfree = true` remains required for `_1password-cli`, Google Android SDK (`androidenv`), and editor/VS Code ecosystem packages that overlays or VS Code HM may pull in. Predicate allowlists proved too brittle as new unfree attrs appear.
 - Some Cursor extensions (nix-ide, python-envs, pylance) install via `cursor --install-extension` at switch time (marketplace builds are not content-addressed like Nix store paths).
 
 ## CI / supply chain
 
-- Workflows pin Actions by **commit SHA** (version in a comment). Dependabot still opens weekly bumps for `github-actions`.
+- All workflows pin Actions by **commit SHA** (version in a comment), including the nng-kit `vendor-check` composite action. Dependabot still opens weekly bumps for `github-actions`.
 - `flake.yml` uses least-privilege `permissions: contents: read`.
+- Release tooling (git-cliff) comes from the flake devShell pinned by `flake.lock`, not a release-asset download.
+- Shellcheck in CI runs from the flake devShell.
+- No workflow expands `${{ }}` inline in a `run:` block. Inputs, step outputs and matrix values reach scripts through `env:` (or the runner's default variables such as `GITHUB_REPOSITORY`), which avoids template injection.
+- `flake.yml`, `update-flake.yml` and `vendor-check.yml` checkouts set `persist-credentials: false` (`update-flake.yml` pushes via `create-pull-request`'s own `token:` input); `release.yml` keeps the token because it pushes the changelog branch with `git push`.
+- Every `flake.yml` and `update-flake.yml` job sets `timeout-minutes`.
 - Starter-only flake checks (`lib-tests`, `fmt`, `shellcheck`, `json-schema`) run in CI so schema and trust-rule regressions fail closed; see [architecture/OVERVIEW.md](architecture/OVERVIEW.md).
 - Eval/fmt/check jobs set up the free public **`dotnix-starter`** Cachix cache after nix-installer (`CACHIX_AUTH_TOKEN`). The step uses `continue-on-error` so missing cache/token soft-fails and jobs still proceed.
 - Release / update-flake workflows need write permissions (or `WORKFLOW_PAT`); scope the PAT tightly and review ruleset exemptions.

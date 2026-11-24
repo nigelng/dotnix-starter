@@ -275,7 +275,7 @@
         };
         git = import ./home/git.nix;
         vim = import ./home/vim.nix;
-        # Cursor editor module (commonBase shared; VS Code HM disabled / reinstate-ready).
+        # Cursor/VS Code editor module (commonBase shared; VS Code HM on when the cask is listed or programs.vscode.enable).
         vscode = import ./home/vscode.nix;
         zsh = import ./home/zsh.nix;
         editor = import ./home/editor.nix;

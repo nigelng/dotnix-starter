@@ -68,9 +68,19 @@ Merge semantics: lists are unioned and deduplicated, maps are host-wins per key,
 | `json-schema` flake check | all eight schemas exist, then `validate-host-json` on the tree | CI `eval` job |
 | `<host>` flake check | builds the full system closure | CI per-host matrix |
 | `validate-host-json.sh` | hosts/user/git (each only when schema and file exist), then per-host host/apps/fonts/firefox/android; `defaultHost` in `hosts` | CI `eval` job, `nix run '.#validate-host-json'`, overlays via `SCHEMA_ROOT` |
-| `scripts/test-correctness.sh` | cases `apps`, `gc`, `android`, `git`, `shell`, `host`, `schema`, `cursor`, `wrapper`, `release`, `all` | CI `eval` job, pre-commit |
+| `scripts/test-correctness.sh` | cases `apps`, `gc`, `android`, `git`, `shell`, `host`, `schema`, `cursor`, `wrapper`, `release`, `pins`, `all` | CI `eval` job, pre-commit |
+| `pinned-sources` flake check | `linkFarm` that builds every pinned fetch: google-fonts, extensions-extra (VSIX), AMO add-ons (`amo-<slug>`), bat theme | CI `eval` job; `update-flake.yml` build step |
 
 The `schema` case checks schema accept/reject (user lists, https add-ons, `hosts`), the validator's `defaultHost` rejection on a temp copy, the nix-darwin and home-manager assertions via `extendModules`, and the Firefox `enable` wiring.
+
+The `pins` case runs `scripts/update-pins.sh` offline against `tests/fixtures/pins`: synthetic sidecars, canned API and `nix` responses, and a stub `curl` that fails if called. It checks the AMO guards, the Marketplace pre-release and engine skips, npm same-major bumps, atomic writes, and that the repo's tracked files are left alone.
+
+Pin sidecars (JSON without a schema, rewritten by `scripts/update-pins.sh`, read with `lib.importJSON`):
+
+- `home/firefox/addons-pins.json`: AMO catalog URL and hash, read by `home/firefox/addons.nix`.
+- `overlays/google-fonts/pins.json`: google/fonts commit and per-font hashes, read by `overlays/google-fonts/default.nix`.
+- `home/vscode/extensions-extra.json`: Marketplace version and VSIX hash, read by `home/vscode/extensions-extra.nix`.
+- `home/bat-theme-pin.json`: catppuccin/bat rev and hash, read by `home/default.nix` and the `pinned-sources` check.
 
 ## Overlay contract
 
@@ -78,6 +88,6 @@ An overlay repo supplies its own `config/` JSON and imports from this flake:
 
 - **Exported:** `homeModules.*`, `darwinModules.*`, `lib` (loaders and pure merge functions), `darwinConfigurationsBuilder`, `overlayFlakeOutputs`, `validateApps`, `scripts.validateHostJson`, `packages.<system>.json-schemas`, `mkWritableCopyActivation`, `editorTooling`.
 - **Overlay gets:** the modules (including the nix user-list and https assertions), loaders, the shared `apps` / `checks` (app, font and Firefox-slug validation, host builds) / `formatter` / `devShell` from `overlayFlakeOutputs`, and the validator with schemas via `SCHEMA_ROOT`. Overlays may pass custom loaders and `extraDarwinModules`; the user-list assertion still checks the final `nix.settings` values (not `nix.extraOptions`).
-- **Starter only:** the `lib-tests`, `fmt`, `shellcheck` and `json-schema` checks, `tests/lib.nix` and `scripts/test-correctness.sh`. They are deliberately not in `overlayFlakeOutputs`.
+- **Starter only:** the `lib-tests`, `fmt`, `shellcheck`, `json-schema` and `pinned-sources` checks, `tests/lib.nix` and `scripts/test-correctness.sh`. They are deliberately not in `overlayFlakeOutputs`.
 - **Missing optional config:** without `config/firefox/base.json` or `config/android/base.json` the loaders return a no-op config and the modules stay disabled.
 - **Intended breaks on upgrade** (unsafe user entries, Firefox host `enable: false`, `defaultHost` not in `hosts`, `user.json` without `defaultGpgKey`): see [Overlay upgrade notes](../../README.md#overlay-upgrade-notes).

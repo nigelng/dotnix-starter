@@ -1,0 +1,11 @@
+{
+  "guid": "browserassistant@adguard.com",
+  "slug": "x",
+  "current_version": {
+    "version": "1",
+    "file": {
+      "url": "https://addons.mozilla.org.evil.example/firefox/downloads/file/1/x.xpi",
+      "hash": "sha256:091223699be040a84b3c7b8bf37f1b21e0f87e75fdfa380a5b45762c1dac7d51"
+    }
+  }
+}

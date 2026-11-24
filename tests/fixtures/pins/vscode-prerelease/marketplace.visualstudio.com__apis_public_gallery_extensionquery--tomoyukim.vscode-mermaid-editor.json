@@ -1,0 +1,58 @@
+{
+  "results": [
+    {
+      "extensions": [
+        {
+          "versions": [
+            {
+              "version": "0.20.0",
+              "targetPlatform": null,
+              "properties": [
+                {
+                  "key": "Microsoft.VisualStudio.Code.Engine",
+                  "value": "^1.80.0"
+                },
+                {
+                  "key": "Microsoft.VisualStudio.Code.PreRelease",
+                  "value": "true"
+                },
+                {
+                  "key": "Microsoft.VisualStudio.Services.VsixSha256",
+                  "value": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                }
+              ]
+            },
+            {
+              "version": "0.19.2",
+              "targetPlatform": null,
+              "properties": [
+                {
+                  "key": "Microsoft.VisualStudio.Code.Engine",
+                  "value": "^1.80.0"
+                },
+                {
+                  "key": "Microsoft.VisualStudio.Services.VsixSha256",
+                  "value": "daba26ad1611abc3d21a17e44212229fcb62d73624db9ae171a91454d0bf4b65"
+                }
+              ]
+            },
+            {
+              "version": "0.19.1",
+              "targetPlatform": null,
+              "properties": [
+                {
+                  "key": "Microsoft.VisualStudio.Code.Engine",
+                  "value": "^1.75.0"
+                },
+                {
+                  "key": "Microsoft.VisualStudio.Services.VsixSha256",
+                  "value": "319911f703d38fe4f08503f491b1f85ea953bd0c1f91b89975fcc0d7443dcf90"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

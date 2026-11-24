@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Focused regression checks for default-install and JSON-config correctness.
 #
-# Usage: scripts/test-correctness.sh [apps|gc|android|git|shell|host|schema|cursor|wrapper|release|all]
+# Usage: scripts/test-correctness.sh [apps|gc|android|git|shell|host|schema|cursor|wrapper|release|pins|all]
 #   (default: all). Run from anywhere; the repo root is derived from this file.
 #
 # Tools (nix, jq, python3 jsonschema) are only required by the cases that use
@@ -354,6 +354,47 @@ test_gc() {
 
   check_gc_option "$attr" automatic "true"
   check_gc_option "$attr" options '"--delete-older-than 14d"'
+  check_optimise "$attr"
+}
+
+# nix.optimise replaces auto-optimise-store; the legacy setting must not be forced on.
+check_optimise() { # attr
+  local interval
+  run_eval nix eval --json "$1.nix.optimise.automatic"
+  if [ "$EVAL_RC" != 0 ]; then
+    fail "gc: evaluate nix.optimise.automatic" "$EVAL_ERR"
+  else
+    check_eq "gc: nix.optimise.automatic" "true" "$EVAL_OUT"
+  fi
+
+  check_auto_optimise_store_off "$1"
+
+  run_eval nix eval --json "$1.nix.optimise.interval"
+  if [ "$EVAL_RC" != 0 ]; then
+    fail "gc: evaluate nix.optimise.interval" "$EVAL_ERR"
+  else
+    interval="$(jq -c 'if type == "array" then . else [.] end' <<<"$EVAL_OUT")"
+    check_optimise_interval "$interval"
+  fi
+}
+
+# Any result other than JSON true (false or null) passes.
+check_auto_optimise_store_off() { # attr
+  run_eval nix eval --json "$1.nix.settings.auto-optimise-store"
+  if [ "$EVAL_RC" != 0 ]; then
+    fail "gc: evaluate nix.settings.auto-optimise-store" "$EVAL_ERR"
+  elif [ "$EVAL_OUT" = "true" ]; then
+    fail "gc: nix.settings.auto-optimise-store must not be true" "use nix.optimise.automatic instead"
+  else
+    pass "gc: nix.settings.auto-optimise-store is not true ($EVAL_OUT)"
+  fi
+}
+
+check_optimise_interval() { # normalised-json-list
+  check_eq "gc: optimise one calendar entry" "1" "$(jq 'length' <<<"$1")"
+  check_eq "gc: optimise Weekday is Sunday (0)" "0" "$(jq -c '.[0].Weekday' <<<"$1")"
+  check_eq "gc: optimise Hour is 4" "4" "$(jq -c '.[0].Hour' <<<"$1")"
+  check_eq "gc: optimise Minute is 0" "0" "$(jq -c '.[0].Minute' <<<"$1")"
 }
 
 # nix.gc is evaluated per option: the whole attrset also forces the removed `dates`.
@@ -1421,10 +1462,523 @@ test_release() {
   check_bump_rejected "unknown bump type is rejected" v1.2.3 foo "Invalid bump type"
 }
 
+# --- case: pins ----------------------------------------------------------------
+# scripts/update-pins.sh against tests/fixtures/pins: synthetic sidecars (root/)
+# and canned API responses (base/ = everything current, plus per-scenario
+# overrides). Each scenario gets fresh copies under $TMP, UPDATE_PINS_ROOT and
+# UPDATE_PINS_FIXTURES point at them, and a stub curl that records its arguments
+# and fails sits first on PATH, so no scenario can touch the network or a real
+# sidecar. A few scenarios instead source the script with fixtures off and a stub
+# nix first on PATH (canned `got:` build output, canned prefetch JSON) to cover
+# the real-nix fallbacks. The case also asserts it left the repo's tracked files alone.
+
+PINS_FIX="$ROOT/tests/fixtures/pins"
+PINS_DIR=""
+PINS_RC=0
+PINS_OUT=""
+PINS_ERR=""
+
+# Stub curl: log one tab-separated line per call, print `{}`, exit $PINS_CURL_RC
+# (99 by default, so an unexpected network call fails loudly).
+write_pins_curl() { # path
+  cat >"$1" <<'FAKE'
+#!/bin/sh
+{ printf 'curl'; for a in "$@"; do printf '\t%s' "$a"; done; printf '\n'; } >> "$PINS_CURL_LOG"
+echo '{}'
+exit "${PINS_CURL_RC:-99}"
+FAKE
+  chmod +x "$1"
+}
+
+# Stub nix for the fixtures-off scenarios: log one tab-separated line per call to
+# <its dir>/log and answer from files beside it. `flake` prints flake.json and
+# exits flake.rc (default 1: no prefetch); `build` prints build.out on stderr and
+# exits build.rc (default 1, as a fake-hash build does); `store` prints
+# prefetch.json and exits prefetch.rc (default 0). Anything else fails loudly.
+write_pins_nix() { # path
+  cat >"$1" <<'FAKE'
+#!/bin/sh
+d="${0%/*}"
+{ printf 'nix'; for a in "$@"; do printf '\t%s' "$a"; done; printf '\n'; } >> "$d/log"
+rc() { if [ -f "$d/$1.rc" ]; then cat "$d/$1.rc"; else echo "$2"; fi; }
+case "$1" in
+  flake) cat "$d/flake.json" 2>/dev/null; exit "$(rc flake 1)" ;;
+  build) cat "$d/build.out" >&2; exit "$(rc build 1)" ;;
+  store) cat "$d/prefetch.json"; exit "$(rc prefetch 0)" ;;
+esac
+echo "stub nix: unexpected call: $*" >&2
+exit 98
+FAKE
+  chmod +x "$1"
+}
+
+pins_setup() { # name [override-dir...]
+  local name="$1" dir
+  shift
+  PINS_DIR="$TMP/pins/$name"
+  mkdir -p "$PINS_DIR/root" "$PINS_DIR/fx" "$PINS_DIR/bin" "$PINS_DIR/nixbin"
+  cp -R "$PINS_FIX/root/." "$PINS_DIR/root/"
+  cp -R "$PINS_FIX/base/." "$PINS_DIR/fx/"
+  for dir in "$@"; do
+    cp -R "$PINS_FIX/$dir/." "$PINS_DIR/fx/"
+  done
+  : >"$PINS_DIR/curl.log"
+  : >"$PINS_DIR/summary"
+  write_pins_curl "$PINS_DIR/bin/curl"
+  write_pins_nix "$PINS_DIR/nixbin/nix"
+  : >"$PINS_DIR/nixbin/log"
+}
+
+# pins_run ARG...: run update-pins.sh in the current scenario.
+pins_run() {
+  PINS_RC=0
+  env -u GH_TOKEN \
+    PATH="$PINS_DIR/bin:$PATH" PINS_CURL_LOG="$PINS_DIR/curl.log" \
+    UPDATE_PINS_ROOT="${PINS_ENV_ROOT:-$PINS_DIR/root}" UPDATE_PINS_FIXTURES="$PINS_DIR/fx" \
+    GITHUB_STEP_SUMMARY="$PINS_DIR/summary" \
+    bash "$ROOT/scripts/update-pins.sh" "$@" >"$PINS_DIR/out" 2>"$PINS_DIR/err" || PINS_RC=$?
+  PINS_OUT="$(cat "$PINS_DIR/out")"
+  PINS_ERR="$(cat "$PINS_DIR/err")"
+}
+
+pins_get() { jq -r "$2" "$PINS_DIR/root/$1"; } # root-relative-file jq-filter
+
+# pins_bash PROGRAM ARG...: run `bash -c PROGRAM _ update-pins.sh ARG...` with
+# fixtures off, the stub nix and the stub curl first on PATH, and stdin passed
+# through; sets PINS_RC, PINS_OUT and PINS_ERR like pins_run.
+pins_bash() {
+  PINS_RC=0
+  env -u UPDATE_PINS_FIXTURES -u GH_TOKEN \
+    PATH="$PINS_DIR/nixbin:$PINS_DIR/bin:$PATH" PINS_CURL_LOG="$PINS_DIR/curl.log" \
+    GITHUB_STEP_SUMMARY="$PINS_DIR/summary" \
+    bash -c "$1" _ "$ROOT/scripts/update-pins.sh" "${@:2}" >"$PINS_DIR/out" 2>"$PINS_DIR/err" || PINS_RC=$?
+  PINS_OUT="$(cat "$PINS_DIR/out")"
+  PINS_ERR="$(cat "$PINS_DIR/err")"
+}
+
+# pins_fn FUNCTION ARG...: call one function of the sourced script.
+pins_fn() {
+  # shellcheck disable=SC2016 # the inner script's $1/$@ expand in the child bash
+  pins_bash '. "$1"; shift; "$@"' "$@"
+}
+
+pins_nix_set() { printf '%s\n' "$2" >"$PINS_DIR/nixbin/$1"; } # stub-file content
+pins_nix_log() { cat "$PINS_DIR/nixbin/log"; }
+
+# check_pins_no_commands LABEL: no output line (stdout, stderr, step summary)
+# starts with `::`, the workflow-command prefix.
+check_pins_no_commands() {
+  check_eq "$1" 0 "$(cat "$PINS_DIR/out" "$PINS_DIR/err" "$PINS_DIR/summary" | grep -c '^::' || true)"
+}
+
+check_pins_untouched() { # label root-relative-file
+  if cmp -s "$PINS_FIX/root/$2" "$PINS_DIR/root/$2"; then
+    pass "$1"
+  else
+    fail "$1" "$2 was modified"
+  fi
+}
+
+# check_pins_offline LABEL: the stub curl was never called.
+check_pins_offline() {
+  check_eq "$1" 0 "$(wc -l <"$PINS_DIR/curl.log" | tr -d ' ')"
+}
+
+ADDONS_PINS="home/firefox/addons-pins.json"
+EXTENSIONS_PINS="home/vscode/extensions-extra.json"
+BAT_PINS="home/bat-theme-pin.json"
+FONTS_PINS="overlays/google-fonts/pins.json"
+NPM_PINS="lib/editor-tooling-package.json"
+
+test_pins_amo_bump() {
+  pins_setup amo-bump amo-bump
+  pins_run amo
+  check_eq "pins: amo bump exits 0" 0 "$PINS_RC"
+  check_has "pins: amo bump reports old -> new" "$PINS_OUT" \
+    "pins: amo: darkreader darkreader-4.9.128.xpi -> darkreader-4.9.135.xpi"
+  check_has "pins: amo current add-on reported unchanged" "$PINS_OUT" \
+    "pins: amo: adguard-browser-assistant unchanged"
+  check_eq "pins: amo bump rewrites the url" \
+    "https://addons.mozilla.org/firefox/downloads/file/5216111/darkreader-4.9.135.xpi" \
+    "$(pins_get "$ADDONS_PINS" '.darkreader.url')"
+  check_eq "pins: amo bump converts the hex hash to SRI" \
+    "sha256-v+1FkdbMaYV/XtM6LTy/vFgR1bksQyPQc10vF1fi3OQ=" "$(pins_get "$ADDONS_PINS" '.darkreader.hash')"
+  check_eq "pins: amo bump keeps name and addonId" "darkreader addon@darkreader.org" \
+    "$(pins_get "$ADDONS_PINS" '.darkreader | "\(.name) \(.addonId)"')"
+  check_eq "pins: amo bump leaves the current entry byte-for-byte" \
+    "$(jq -c '.["adguard-browser-assistant"]' "$PINS_FIX/root/$ADDONS_PINS")" \
+    "$(pins_get "$ADDONS_PINS" '.["adguard-browser-assistant"]' | jq -c .)"
+  check_has "pins: amo bump is appended to GITHUB_STEP_SUMMARY" "$(cat "$PINS_DIR/summary")" \
+    "pins: amo: darkreader darkreader-4.9.128.xpi -> darkreader-4.9.135.xpi"
+  check_eq "pins: amo bump leaves no temp file behind" 1 \
+    "$(find "$PINS_DIR/root/home/firefox" -type f | wc -l | tr -d ' ')"
+  check_pins_offline "pins: amo bump never calls curl (fixtures only)"
+}
+
+# A rejected entry fails the run and nothing in that sidecar is written, not even
+# the valid bump sitting next to it.
+check_pins_amo_rejected() { # scenario reason-fragment
+  pins_setup "amo-$1" "$1"
+  pins_run amo
+  check_eq "pins: $1 exits 1" 1 "$PINS_RC"
+  check_pins_untouched "pins: $1 leaves the sidecar untouched" "$ADDONS_PINS"
+  check_has "pins: $1 explains the rejection" "$PINS_ERR" "$2"
+  check_pins_offline "pins: $1 never calls curl"
+}
+
+test_pins_amo_rejections() {
+  check_pins_amo_rejected amo-bad-guid "guid mismatch"
+  check_pins_amo_rejected amo-bad-host "unexpected download url"
+  check_pins_amo_rejected amo-bad-hash "unexpected hash"
+  # The pattern is anchored at the end too: nothing may trail the file name.
+  check_pins_amo_rejected amo-bad-url-tail "unexpected download url"
+  # An embedded newline is rejected, and never reaches the output as a new line.
+  check_pins_amo_rejected amo-ctrl-url "control characters"
+  check_pins_no_commands "pins: amo-ctrl-url prints no line starting with ::"
+}
+
+test_pins_vscode() {
+  pins_setup vscode-pre vscode-prerelease
+  pins_run vscode
+  check_eq "pins: vscode pre-release skip exits 0" 0 "$PINS_RC"
+  check_eq "pins: vscode skips the newer pre-release for the newest stable" 0.19.2 \
+    "$(pins_get "$EXTENSIONS_PINS" '.[0].version')"
+  check_eq "pins: vscode hash comes from VsixSha256 as SRI" \
+    "sha256-2romrRYRq8PSGhfkQhIin8ti1zYk25rhcakUVNC/S2U=" "$(pins_get "$EXTENSIONS_PINS" '.[0].hash')"
+  check_eq "pins: vscode leaves the other extension alone" "1.1.32" "$(pins_get "$EXTENSIONS_PINS" '.[1].version')"
+  check_has "pins: vscode reports old -> new" "$PINS_OUT" \
+    "pins: vscode: tomoyukim.vscode-mermaid-editor 0.19.1 -> 0.19.2"
+  check_pins_offline "pins: vscode never calls curl"
+
+  # Engine ^1.200.0 is newer than the locked 1.119.0 (numeric, not string, compare).
+  pins_setup vscode-eng vscode-engine
+  pins_run vscode
+  check_eq "pins: vscode engine skip exits 0" 0 "$PINS_RC"
+  check_pins_untouched "pins: vscode skips a version newer than the locked engine" "$EXTENSIONS_PINS"
+  check_has "pins: vscode engine skip is reported" "$PINS_OUT" "skipped"
+
+  # The newest stable (0.19.0) is older than the pin (0.19.1): never a downgrade.
+  pins_setup vscode-old vscode-older
+  pins_run vscode
+  check_eq "pins: vscode older stable exits 0" 0 "$PINS_RC"
+  check_pins_untouched "pins: vscode never downgrades a newer pin" "$EXTENSIONS_PINS"
+  check_has "pins: vscode older stable is reported as not newer" "$PINS_OUT" "0.19.0 is not newer than 0.19.1"
+  check_pins_offline "pins: vscode downgrade check never calls curl"
+
+  # A control character in the response rejects the entry and never starts a line.
+  pins_setup vscode-ctrl vscode-ctrl
+  pins_run vscode
+  check_eq "pins: vscode control-character version exits 1" 1 "$PINS_RC"
+  check_pins_untouched "pins: vscode control-character version leaves the sidecar untouched" "$EXTENSIONS_PINS"
+  check_has "pins: vscode control-character version is explained" "$PINS_ERR" "control characters"
+  check_pins_no_commands "pins: vscode control-character version prints no line starting with ::"
+}
+
+check_pins_failed() { check_eq "$1" 1 "$([ "$PINS_RC" -ne 0 ] && echo 1 || echo 0)"; } # label
+
+check_pins_newer() { # label expected-status candidate current
+  pins_fn version_newer "$3" "$4"
+  check_eq "$1" "$2" "$PINS_RC"
+}
+
+test_pins_version_newer() {
+  pins_setup version
+  check_pins_newer "pins: version_newer: 1.10.0 is newer than 1.9.0 (numeric)" 0 1.10.0 1.9.0
+  check_pins_newer "pins: version_newer: 1.9.0 is not newer than 1.10.0" 1 1.9.0 1.10.0
+  check_pins_newer "pins: version_newer: equal is not newer" 1 0.19.1 0.19.1
+  check_pins_newer "pins: version_newer: 1.2 equals 1.2.0" 1 1.2 1.2.0
+  check_pins_newer "pins: version_newer: 1.2.1 is newer than 1.2" 0 1.2.1 1.2
+  check_pins_newer "pins: version_newer: a suffix is undecidable" 2 1.2.3-beta 1.2.0
+  check_pins_newer "pins: version_newer: non-numeric is undecidable" 2 latest 1.2.0
+  check_pins_newer "pins: version_newer: empty is undecidable" 2 "" 1.2.0
+  check_pins_newer "pins: version_newer: an embedded newline is undecidable" 2 $'1.2\n3' 1.0
+}
+
+# Real-nix fallbacks, offline: a stub nix answers (see write_pins_nix).
+test_pins_fake_hash_build() {
+  local got="sha256-2romrRYRq8PSGhfkQhIin8ti1zYk25rhcakUVNC/S2U="
+  pins_setup nix-build
+  pins_nix_set build.out "error: hash mismatch in fixed-output derivation '/nix/store/x-source.drv':
+         specified: sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+            got:    $got"
+  pins_fn fake_hash_build 'pkgs.hello'
+  check_eq "pins: fake_hash_build exits 0 on a hash mismatch" 0 "$PINS_RC"
+  check_eq "pins: fake_hash_build prints the got: hash, not the specified one" "$got" "$PINS_OUT"
+  check_has "pins: fake_hash_build builds the expression against the flake's pkgs" "$(pins_nix_log)" \
+    "pkgsForValidation; in pkgs.hello"
+  check_pins_offline "pins: fake_hash_build never calls curl"
+
+  pins_nix_set build.rc 0
+  pins_fn fake_hash_build 'pkgs.hello'
+  check_eq "pins: fake_hash_build refuses a build that succeeds" 1 "$PINS_RC"
+  check_has "pins: fake_hash_build explains the refusal" "$PINS_ERR" "build succeeded with a fake hash"
+  check_eq "pins: fake_hash_build prints no hash after a refusal" "" "$PINS_OUT"
+
+  rm "$PINS_DIR/nixbin/build.rc"
+  pins_nix_set build.out "error: builder for '/nix/store/x.drv' failed"
+  pins_fn fake_hash_build 'pkgs.hello'
+  check_eq "pins: fake_hash_build fails when the output has no got: line" 1 "$PINS_RC"
+  check_has "pins: fake_hash_build says it could not read the hash" "$PINS_ERR" "could not read the hash"
+}
+
+test_pins_prefetch_fallbacks() {
+  local hash="sha256-ZGFiYTI2YWQxNjExYWJjM2QyMWExN2U0NDIxMjIyOWY="
+  local rev=0123456789abcdef0123456789abcdef01234567 tab=$'\t'
+  pins_setup nix-prefetch
+  pins_nix_set prefetch.json "{\"hash\":\"$hash\",\"storePath\":\"/nix/store/x-file\"}"
+  pins_fn prefetch_vsix pub ext 1.2.3
+  check_eq "pins: prefetch_vsix exits 0" 0 "$PINS_RC"
+  check_eq "pins: prefetch_vsix prints the hash from the prefetch-file JSON" "$hash" "$PINS_OUT"
+  check_has "pins: prefetch_vsix prefetches the VSIX URL" "$(pins_nix_log)" \
+    "store${tab}prefetch-file${tab}--json${tab}https://pub.gallery.vsassets.io/_apis/public/gallery/publisher/pub/extension/ext/1.2.3/assetbyname/Microsoft.VisualStudio.Services.VSIXPackage"
+  pins_nix_set prefetch.json '{"storePath":"/nix/store/x-file"}'
+  pins_fn prefetch_vsix pub ext 1.2.3
+  check_pins_failed "pins: prefetch_vsix fails when the JSON has no hash"
+  pins_nix_set prefetch.json "{\"hash\":\"$hash\"}"
+  pins_nix_set prefetch.rc 1
+  pins_fn prefetch_vsix pub ext 1.2.3
+  check_pins_failed "pins: prefetch_vsix fails when nix fails"
+  check_pins_offline "pins: prefetch_vsix never calls curl"
+
+  # prefetch_bat: `nix flake prefetch` first, the fake-hash build only as fallback.
+  pins_setup nix-bat
+  pins_nix_set flake.json "{\"hash\":\"$hash\"}"
+  pins_nix_set flake.rc 0
+  pins_fn prefetch_bat catppuccin bat "$rev"
+  check_eq "pins: prefetch_bat uses the flake prefetch hash" "$hash" "$PINS_OUT"
+  check_lacks "pins: prefetch_bat does not build when the flake prefetch works" "$(pins_nix_log)" "build"
+
+  pins_setup nix-bat-fallback
+  pins_nix_set build.out "error: hash mismatch in fixed-output derivation '/nix/store/x-source.drv':
+         specified: sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+            got:    $hash"
+  pins_fn prefetch_bat catppuccin bat "$rev"
+  check_eq "pins: prefetch_bat falls back to the fake-hash build" "$hash" "$PINS_OUT"
+  check_has "pins: prefetch_bat tried the flake prefetch first" "$(pins_nix_log)" "flake${tab}prefetch${tab}--json${tab}github:catppuccin/bat/$rev"
+  check_has "pins: prefetch_bat fallback builds the pinned rev" "$(pins_nix_log)" "rev = \"$rev\""
+  pins_nix_set build.rc 0
+  pins_fn prefetch_bat catppuccin bat "$rev"
+  check_eq "pins: prefetch_bat fallback refuses a build that succeeds" 1 "$PINS_RC"
+  check_pins_offline "pins: prefetch_bat never calls curl"
+}
+
+# Reporting never emits a fetched value as a line of its own.
+test_pins_report_sanitized() {
+  pins_setup sanitize
+  pins_fn err $'bad\n::error::injected\r::x'
+  check_eq "pins: err replaces newlines and carriage returns" \
+    "pins: error: bad ::error::injected ::x" "$PINS_ERR"
+  check_pins_no_commands "pins: err output has no line starting with ::"
+  pins_fn note $'moved\n::warning::injected'
+  check_eq "pins: note replaces newlines" "pins: moved ::warning::injected" "$PINS_OUT"
+  check_eq "pins: the step summary stays one line per entry" 2 "$(wc -l <"$PINS_DIR/summary" | tr -d ' ')"
+  check_pins_no_commands "pins: the step summary has no line starting with ::"
+}
+
+# errexit must really be on inside an updater: drive the real `main` with a fake
+# source whose update_fake hits a bare `false` before it would write its sidecar.
+test_pins_errexit() {
+  local side
+  pins_setup errexit
+  side="$PINS_DIR/sidecar"
+  : >"$side"
+  # shellcheck disable=SC2016 # the inner script's $1/$2/$3 expand in the child bash
+  pins_bash '. "$1"; need_tools() { :; }; parse_args() { ROOT=/; SELECTED=fake; }
+    SIDE="$2"; eval "update_fake() { $3; }"; main' "$side" 'false; echo written >"$SIDE"'
+  check_eq "pins: a failing step inside an updater fails the run" 1 "$PINS_RC"
+  check_eq "pins: a failing step stops the updater before it writes" "" "$(cat "$side")"
+  check_has "pins: the failed source is reported" "$PINS_ERR" "fake: update failed"
+
+  # shellcheck disable=SC2016 # the inner script's $1/$2/$3 expand in the child bash
+  pins_bash '. "$1"; need_tools() { :; }; parse_args() { ROOT=/; SELECTED=fake; }
+    SIDE="$2"; eval "update_fake() { $3; }"; main' "$side" 'true; echo written >"$SIDE"'
+  check_eq "pins: an updater that succeeds exits 0" 0 "$PINS_RC"
+  check_eq "pins: the harness writes when nothing fails" written "$(cat "$side")"
+}
+
+test_pins_bat() {
+  pins_setup bat-noop
+  pins_run bat
+  check_eq "pins: bat no-op exits 0" 0 "$PINS_RC"
+  check_has "pins: bat no-op reports unchanged" "$PINS_OUT" "pins: bat: catppuccin/bat unchanged"
+  check_pins_untouched "pins: bat no-op leaves the sidecar untouched" "$BAT_PINS"
+
+  pins_setup bat-bump bat-bump
+  pins_run bat
+  check_eq "pins: bat bump exits 0" 0 "$PINS_RC"
+  check_eq "pins: bat bump moves rev and hash" \
+    "0123456789abcdef0123456789abcdef01234567 sha256-2romrRYRq8PSGhfkQhIin8ti1zYk25rhcakUVNC/S2U=" \
+    "$(pins_get "$BAT_PINS" '"\(.rev) \(.hash)"')"
+  check_has "pins: bat bump reports old -> new" "$PINS_OUT" "pins: bat: catppuccin/bat 6810349 -> 0123456"
+}
+
+test_pins_google_fonts() {
+  pins_setup fonts-noop
+  pins_run google-fonts
+  check_eq "pins: google-fonts no-op exits 0" 0 "$PINS_RC"
+  check_has "pins: google-fonts no-op reports unchanged" "$PINS_OUT" "pins: google-fonts: unchanged"
+  check_pins_untouched "pins: google-fonts no-op leaves the sidecar untouched" "$FONTS_PINS"
+
+  pins_setup fonts-bump fonts-bump
+  pins_run google-fonts
+  check_eq "pins: google-fonts bump exits 0" 0 "$PINS_RC"
+  check_eq "pins: google-fonts bump moves rev to the default-branch HEAD" \
+    fedcba9876543210fedcba9876543210fedcba98 "$(pins_get "$FONTS_PINS" '.rev')"
+  check_eq "pins: google-fonts bump re-hashes every font" \
+    "sha256-ZGFiYTI2YWQxNjExYWJjM2QyMWExN2U0NDIxMjIyOWY= sha256-cmVzYWx0LWludGVyLWhhc2gtZml4dHVyZS12YWx1ZTE=" \
+    "$(pins_get "$FONTS_PINS" '"\(.fonts.lato.hash) \(.fonts.inter.hash)"')"
+
+  # One font failing to hash must not leave pins.json half-updated.
+  pins_setup fonts-partial fonts-bump
+  rm "$PINS_DIR/fx/prefetch/font-fedcba9876543210fedcba9876543210fedcba98-ofl_inter.txt"
+  pins_run google-fonts
+  check_eq "pins: google-fonts partial re-hash exits 1" 1 "$PINS_RC"
+  check_pins_untouched "pins: google-fonts writes pins.json only after every font hashed" "$FONTS_PINS"
+}
+
+test_pins_npm() {
+  pins_setup npm-minor npm-minor
+  pins_run npm
+  check_eq "pins: npm minor bump exits 0" 0 "$PINS_RC"
+  check_eq "pins: npm bumps to the highest plain X.Y.Z in the pinned major" \
+    "10.16.0 3.10.2" "$(pins_get "$NPM_PINS" '"\(.dependencies.eslint) \(.dependencies.prettier)"')"
+  check_eq "pins: npm leaves the other dependencies alone" "file:eslint-config" \
+    "$(pins_get "$NPM_PINS" '.dependencies["@nigelng/eslint-config"]')"
+  check_has "pins: npm reports old -> new" "$PINS_OUT" "pins: npm: prettier 3.10.1 -> 3.10.2"
+  check_lacks "pins: npm same-major bump has no major warning" "$PINS_OUT" "available"
+
+  pins_setup npm-major npm-major
+  pins_run npm
+  check_eq "pins: npm new-major warning exits 0" 0 "$PINS_RC"
+  check_has "pins: npm warns about the newer major" "$PINS_OUT" "pins: npm: eslint 11 available"
+  check_pins_untouched "pins: npm never auto-bumps across a major" "$NPM_PINS"
+}
+
+test_pins_continues_after_failure() {
+  pins_setup all-continue amo-bad-guid npm-minor
+  pins_run all
+  check_eq "pins: all exits 1 when one updater fails" 1 "$PINS_RC"
+  check_pins_untouched "pins: all leaves the failed sidecar untouched" "$ADDONS_PINS"
+  check_eq "pins: all still runs the other updaters after a failure" 10.16.0 \
+    "$(pins_get "$NPM_PINS" '.dependencies.eslint')"
+  check_has "pins: all reports the failing source" "$PINS_ERR" "amo"
+  check_pins_offline "pins: all never calls curl"
+}
+
+test_pins_fixture_seam() {
+  pins_setup seam npm-minor
+  rm "$PINS_DIR/fx/registry.npmjs.org_eslint.json"
+  pins_run npm
+  check_eq "pins: a missing fixture fails the run" 1 "$PINS_RC"
+  check_has "pins: a missing fixture is named" "$PINS_ERR" "missing fixture"
+  check_pins_untouched "pins: a missing fixture leaves the sidecar untouched" "$NPM_PINS"
+  check_pins_offline "pins: a missing fixture does not fall through to curl"
+}
+
+test_pins_cli() {
+  pins_setup cli npm-minor
+  PINS_ENV_ROOT="$PINS_DIR/nonexistent" pins_run --root "$PINS_DIR/root" npm
+  check_eq "pins: --root overrides UPDATE_PINS_ROOT" 10.16.0 "$(pins_get "$NPM_PINS" '.dependencies.eslint')"
+  pins_run bogus
+  check_eq "pins: an unknown source is a usage error" 2 "$PINS_RC"
+
+  pins_setup cli-two npm-minor
+  pins_run amo npm
+  check_eq "pins: a second source is a usage error" 2 "$PINS_RC"
+  check_has "pins: a second source is explained on stderr" "$PINS_ERR" "only one source"
+  check_eq "pins: a rejected second source runs nothing" "" "$PINS_OUT"
+  check_pins_untouched "pins: a rejected second source leaves the first sidecar alone" "$ADDONS_PINS"
+  check_pins_untouched "pins: a rejected second source leaves the last sidecar alone" "$NPM_PINS"
+  pins_run npm all
+  check_eq "pins: a source followed by all is a usage error" 2 "$PINS_RC"
+}
+
+# GH_TOKEN scoping: source the script with fixtures off and the stub curl first
+# on PATH; fetch_json must send the bearer token to https://api.github.com/ only.
+pins_fetch() { # url...: fetch_json each url with GH_TOKEN=tok-secret
+  # shellcheck disable=SC2016 # the inner script's $1/$u expand in the child bash
+  env -u UPDATE_PINS_FIXTURES \
+    PATH="$PINS_DIR/bin:$PATH" PINS_CURL_LOG="$PINS_DIR/curl.log" PINS_CURL_RC=0 \
+    GH_TOKEN="${PINS_TOKEN-tok-secret}" \
+    bash -c '. "$1"; shift; for u; do fetch_json "$u" -X POST -d "{}" >/dev/null; done' _ \
+    "$ROOT/scripts/update-pins.sh" "$@"
+}
+
+# curl_call URL: the stub's logged line for that URL (the URL is its last field).
+curl_call() { awk -F '\t' -v u="$1" '$NF == u' "$PINS_DIR/curl.log"; }
+
+check_pins_no_auth() { # url
+  local call
+  call="$(curl_call "$1")"
+  check_has "pins: GH_TOKEN scoping: request was made for $1" "$call" "$1"
+  check_lacks "pins: GH_TOKEN scoping: no Authorization for $1" "$call" "Authorization"
+}
+
+test_pins_token_scope() {
+  local gh="https://api.github.com/repos/google/fonts/commits/HEAD" call
+  pins_setup token
+  pins_fetch \
+    "https://addons.mozilla.org/api/v5/addons/addon/x/" \
+    "https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery" \
+    "https://registry.npmjs.org/eslint" \
+    "https://api.github.com.evil.example/repos/x" \
+    "https://api.github.com@evil.example/repos/x" \
+    "$gh"
+  check_pins_no_auth "https://addons.mozilla.org/api/v5/addons/addon/x/"
+  check_pins_no_auth "https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery"
+  check_pins_no_auth "https://registry.npmjs.org/eslint"
+  check_pins_no_auth "https://api.github.com.evil.example/repos/x"
+  check_pins_no_auth "https://api.github.com@evil.example/repos/x"
+  call="$(curl_call "$gh")"
+  check_has "pins: GH_TOKEN scoping: bearer token sent to https://api.github.com/" "$call" \
+    "Authorization: Bearer tok-secret"
+  check_eq "pins: GH_TOKEN scoping: the token appears in exactly one request" 1 \
+    "$(grep -c -F tok-secret "$PINS_DIR/curl.log" || true)"
+
+  pins_setup token-unset
+  PINS_TOKEN="" pins_fetch "$gh"
+  check_lacks "pins: GH_TOKEN scoping: no Authorization when GH_TOKEN is empty" "$(curl_call "$gh")" \
+    "Authorization"
+}
+
+repo_fingerprint() { # tracked-file state: porcelain status plus a hash of the diff
+  git -C "$ROOT" status --porcelain
+  git -C "$ROOT" diff | git hash-object --stdin
+}
+
+test_pins() {
+  local before="" after="" tracked=0
+  need_tools nix jq git
+  init_tmp
+  if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    tracked=1
+    before="$(repo_fingerprint)"
+  fi
+  test_pins_amo_bump
+  test_pins_amo_rejections
+  test_pins_vscode
+  test_pins_bat
+  test_pins_google_fonts
+  test_pins_npm
+  test_pins_continues_after_failure
+  test_pins_fixture_seam
+  test_pins_cli
+  test_pins_version_newer
+  test_pins_fake_hash_build
+  test_pins_prefetch_fallbacks
+  test_pins_report_sanitized
+  test_pins_errexit
+  test_pins_token_scope
+  if [ "$tracked" = 1 ]; then
+    after="$(repo_fingerprint)"
+    check_eq "pins: the case leaves the repo's tracked-file state unchanged" "$before" "$after"
+  fi
+}
+
 # --- entry point ----------------------------------------------------------------
 
 usage() {
-  echo "usage: ${0##*/} [apps|gc|android|git|shell|host|schema|cursor|wrapper|release|all]"
+  echo "usage: ${0##*/} [apps|gc|android|git|shell|host|schema|cursor|wrapper|release|pins|all]"
 }
 
 summary() {
@@ -1444,6 +1998,7 @@ main() {
     cursor) test_cursor ;;
     wrapper) test_wrapper ;;
     release) test_release ;;
+    pins) test_pins ;;
     all)
       test_wrapper
       test_apps
@@ -1455,6 +2010,7 @@ main() {
       test_schema
       test_cursor
       test_release
+      test_pins
       ;;
     -h | --help)
       usage

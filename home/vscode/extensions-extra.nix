@@ -1,6 +1,8 @@
 # Marketplace extensions not (yet) packaged under pkgs.vscode-extensions.
+# Pins live in extensions-extra.json; bump them with scripts/update-pins.sh.
 { pkgs }:
 let
+  inherit (pkgs) lib;
   inherit (pkgs.vscode-utils) buildVscodeMarketplaceExtension;
 
   mkExt =
@@ -9,7 +11,7 @@ let
       name,
       version,
       hash,
-      license ? pkgs.lib.licenses.mit,
+      license ? "mit",
     }:
     buildVscodeMarketplaceExtension {
       mktplcRef = {
@@ -20,23 +22,10 @@ let
           hash
           ;
       };
-      meta = {
-        inherit license;
-      };
+      meta.license = lib.licenses.${license};
     };
-in
-{
-  tomoyukim.vscode-mermaid-editor = mkExt {
-    publisher = "tomoyukim";
-    name = "vscode-mermaid-editor";
-    version = "0.19.1";
-    hash = "sha256-MZkR9wPTj+TwhQP0kbH4XqlTvQwfkbiZdfzA10Q9z5A=";
-  };
 
-  streetsidesoftware.code-spell-checker-australian-english = mkExt {
-    publisher = "streetsidesoftware";
-    name = "code-spell-checker-australian-english";
-    version = "1.1.32";
-    hash = "sha256-zn/DIzrF5sJ/jMGbc6IOQz6pTNZOBhimqMvpuuYal0k=";
-  };
-}
+  # Rebuild the `<publisher>.<name>` attrset consumed by extensions.nix.
+  mkExtAttr = acc: pin: lib.recursiveUpdate acc { ${pin.publisher}.${pin.name} = mkExt pin; };
+in
+lib.foldl' mkExtAttr { } (lib.importJSON ./extensions-extra.json)

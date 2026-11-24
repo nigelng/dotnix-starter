@@ -1,6 +1,6 @@
 # macOS 27 readiness
 
-Apple year-based releases (macOS 26 → **macOS 27**) move on a different schedule than NixOS / nix-darwin channel trains (`nixos-26.05`, then typically `26.11` / `27.05`). This template stays on **`*-26.05`** until matching release branches exist and build cleanly.
+Apple year-based releases (macOS 26 → **macOS 27**) move on a different schedule than NixOS / nix-darwin channel trains (`nixpkgs-26.05-darwin`, then typically `26.11` / `27.05`). This template stays on **`*-26.05`** until matching release branches exist and build cleanly.
 
 `nix flake update` only refreshes lock revisions **within** the current channel refs. A major OS / channel bump is a deliberate `flake.nix` edit.
 
@@ -8,7 +8,7 @@ Apple year-based releases (macOS 26 → **macOS 27**) move on a different schedu
 
 1. Set `"automaticallyInstallMacOSUpdates": false` in `config/hosts/<host>.json` (defaults to `true`). Re-switch so Software Update does not jump ahead of nix-darwin support.
 2. Keep a known-good generation; test on one machine first.
-3. Track [nix-darwin](https://github.com/LnL7/nix-darwin) and nixpkgs Darwin issues for the new OS.
+3. Track [nix-darwin](https://github.com/nix-darwin/nix-darwin) and nixpkgs Darwin issues for the new OS.
 4. Re-check network service names after upgrade:
 
    ```sh

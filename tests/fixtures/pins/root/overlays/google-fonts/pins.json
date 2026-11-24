@@ -1,0 +1,13 @@
+{
+  "rev": "c89741abbf4eeabce432c3ed2fd7dc28b022701e",
+  "fonts": {
+    "lato": {
+      "path": "ofl/lato",
+      "hash": "sha256-Y5Xpqe5ucvtDf8SYOHbnsqHGDsC9rYxLi4j9Fmf0Hpw="
+    },
+    "inter": {
+      "path": "ofl/inter",
+      "hash": "sha256-nJ35zZWRbOTcE3OWqOOTqJKY0JT4x5msm4a7O//9IP8="
+    }
+  }
+}

@@ -55,9 +55,9 @@ nix-darwin does **not** manage disk encryption or Gatekeeper assessment policy. 
 ## Firefox
 
 - The Firefox **app** comes from the Homebrew `firefox` cask only. home-manager never installs Firefox from nixpkgs (`programs.firefox.package = null` always).
-- Default add-ons use enterprise `ExtensionSettings` (`force_installed`) with **pinned** AMO file URLs from `home/firefox/addons.nix` / `extensions.manual`. Firefox fetches Mozilla-signed XPIs at first launch or after policy apply (HTTPS + AMO + Mozilla signing).
+- Default add-ons use enterprise `ExtensionSettings` (`force_installed`) with **pinned** AMO file URLs from the catalog (`home/firefox/addons-pins.json`, read by `home/firefox/addons.nix`) and `extensions.manual`. Firefox fetches Mozilla-signed XPIs at first launch or after policy apply (HTTPS + AMO + Mozilla signing).
 - The curated catalog may include optional AMO slugs beyond the default `extensions.nix` set (e.g. `adguard-browser-assistant` for AdGuard desktop users). Same pin/bump rules apply; overlays opt in via JSON slugs — do not ship conflicting AdGuard AdBlocker + Browser Assistant together.
-- **Trust gap vs Nix store:** policy install does **not** verify sha256 at `nix switch`. Mitigations: pin file URLs in git, keep `extensions.update.enabled` / `autoUpdateDefault` false, bump catalog/manual URLs intentionally for CVE fixes.
+- **Trust gap vs Nix store:** policy install does **not** verify sha256 at `nix switch`. Mitigations: pin file URLs in git, keep `extensions.update.enabled` / `autoUpdateDefault` false, refresh catalog pins through the weekly reviewed PR (see [Weekly pin refresh](#weekly-pin-refresh)), and bump `manual` URLs intentionally for CVE fixes.
 - Do **not** duplicate starter `addonId`s in overlay `ExtensionSettings` — starter owns the force-installed list from JSON; overlays should use `extensions.nix` slugs or `manual` entries.
 - `extensions.manual` accepts an arbitrary URL + hash — treat host JSON as trusted input (a malicious URL compromises the profile). URLs must be `https://`: `config/schema/firefox.schema.json` rejects other schemes and `home/firefox.nix` asserts the same for `my.firefox.manualExtensions` set from Nix. The rule covers only `extensions.manual` / `my.firefox.manualExtensions`. Direct `programs.firefox.policies` settings (e.g. `ExtensionSettings.<id>.install_url`) and profile extensions set from other modules are not inspected. Don't add add-ons that way, or keep their URLs `https://` yourself.
 - Profile-dir XPI sideload (`extensionInstallMode = "sideload"`) is an undocumented escape hatch only; official/Homebrew Firefox builds typically ignore new sideloads.
@@ -70,6 +70,18 @@ nix-darwin does **not** manage disk encryption or Gatekeeper assessment policy. 
 - `commonBase` is free (Git Graph removed and not installed). `nixpkgs.config.allowUnfree = true` remains required for `_1password-cli`, Google Android SDK (`androidenv`), and editor/VS Code ecosystem packages that overlays or VS Code HM may pull in. Predicate allowlists proved too brittle as new unfree attrs appear.
 - Some Cursor extensions (nix-ide, python-envs, pylance) install via `cursor --install-extension` at switch time (marketplace builds are not content-addressed like Nix store paths).
 
+## Weekly pin refresh
+
+`update-flake.yml` (Mondays, and on demand) runs `nix flake update` and `scripts/update-pins.sh all`, then opens a PR. The script rewrites four pin sidecars: `home/firefox/addons-pins.json` (AMO), `home/vscode/extensions-extra.json` (Marketplace), `home/bat-theme-pin.json` (catppuccin/bat HEAD) and `overlays/google-fonts/pins.json` (google/fonts commit and hashes). It also updates the same-major npm `eslint` / `prettier` pins in `lib/editor-tooling-package.json` and refreshes the editor-tooling lock.
+
+- **Atomic, all-or-nothing per file.** A sidecar is rewritten only when every entry in it passes its guards; a failed updater leaves its file untouched.
+- **AMO guards.** The response must report the expected `guid`, a download URL under `https://addons.mozilla.org/firefox/downloads/file/<id>/`, and a `sha256:` hash. Anything else is rejected.
+- **No pre-releases.** Marketplace versions flagged as pre-release are skipped, as are versions whose engine is newer than the locked VS Code. npm moves only within the pinned major; a newer major is reported, not applied.
+- **In-workflow verification.** The `update` job builds `example-mac` and `pinned-sources` before the PR is opened. A failed build is recorded and the run goes red, but the PR still opens. The build step has its own 60-minute timeout, so a slow cold-cache build counts as a failed build rather than cancelling the job. This step uses no token, so it does not depend on `WORKFLOW_PAT`.
+- **Token scope.** `GH_TOKEN` is sent only to `https://api.github.com/*`, and redirects are not followed.
+- **Two-job split.** The `update` job runs Nix and repo scripts with a `contents: read` token. Only the Nix-free `pr` job holds `contents: write` and `pull-requests: write`. It accepts only regular files at allowlisted paths and refuses symlink destinations before it copies anything into the PR branch.
+- **PR review.** Reviewers check the `flake.lock` diff, the AMO and VSIX URLs in the sidecars, and any `pins: npm: <pkg> <major> available` warnings. Cursor engine drift is an accepted risk covered by this review.
+
 ## CI / supply chain
 
 - All workflows pin Actions by **commit SHA** (version in a comment), including the nng-kit `vendor-check` composite action. Dependabot still opens weekly bumps for `github-actions`.
@@ -79,8 +91,8 @@ nix-darwin does **not** manage disk encryption or Gatekeeper assessment policy. 
 - No workflow expands `${{ }}` inline in a `run:` block. Inputs, step outputs and matrix values reach scripts through `env:` (or the runner's default variables such as `GITHUB_REPOSITORY`), which avoids template injection.
 - `flake.yml`, `update-flake.yml` and `vendor-check.yml` checkouts set `persist-credentials: false` (`update-flake.yml` pushes via `create-pull-request`'s own `token:` input); `release.yml` keeps the token because it pushes the changelog branch with `git push`.
 - Every job in every workflow sets `timeout-minutes`.
-- Starter-only flake checks (`lib-tests`, `fmt`, `shellcheck`, `json-schema`) run in CI so schema and trust-rule regressions fail closed; see [architecture/OVERVIEW.md](architecture/OVERVIEW.md).
+- Starter-only flake checks (`lib-tests`, `fmt`, `shellcheck`, `json-schema`, `pinned-sources`) run in CI so schema and trust-rule regressions fail closed; see [architecture/OVERVIEW.md](architecture/OVERVIEW.md).
 - Eval/fmt/check jobs set up the free public **`dotnix-starter`** Cachix cache after nix-installer (`CACHIX_AUTH_TOKEN`). The step uses `continue-on-error` so missing cache/token soft-fails and jobs still proceed.
-- Release / update-flake workflows need write permissions (or `WORKFLOW_PAT`); scope the PAT tightly and review ruleset exemptions.
+- `release.yml` needs write permissions. `update-flake.yml` needs them only in its `pr` job (or a `WORKFLOW_PAT` to open PRs); scope the PAT tightly and review ruleset exemptions.
 
 See also [MACOS-27.md](MACOS-27.md) for major OS upgrade guidance.

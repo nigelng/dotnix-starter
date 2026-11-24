@@ -14,7 +14,7 @@
   description = "nix-darwin + home-manager template (macOS)";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-26.05-darwin";
 
     home-manager = {
       url = "github:nix-community/home-manager/release-26.05";
@@ -22,7 +22,7 @@
     };
 
     darwin = {
-      url = "github:LnL7/nix-darwin/nix-darwin-26.05";
+      url = "github:nix-darwin/nix-darwin/nix-darwin-26.05";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -177,6 +177,35 @@
               shellcheck scripts/*.sh build-darwin.sh
               touch $out
             '';
+
+        # Builds every pinned source (google-fonts, extra VS Code extensions, AMO add-ons,
+        # bat theme) so a stale or mistyped hash in a *-pins.json sidecar fails CI.
+        pinned-sources =
+          let
+            addons = import ./home/firefox/addons.nix {
+              pkgs = pkgsForValidation;
+              inherit lib;
+            };
+            googleFonts = import ./overlays/google-fonts pkgsForValidation pkgsForValidation;
+            extensionsExtra = import ./home/vscode/extensions-extra.nix { pkgs = pkgsForValidation; };
+            batThemeSrc = pkgsForValidation.fetchFromGitHub (lib.importJSON ./home/bat-theme-pin.json);
+          in
+          pkgs.linkFarm "pinned-sources" (
+            lib.mapAttrsToList (name: path: { inherit name path; }) (
+              googleFonts
+              // lib.listToAttrs (
+                map (drv: lib.nameValuePair "extensions-extra-${drv.name}" drv) (
+                  lib.collect lib.isDerivation extensionsExtra
+                )
+              )
+              // lib.mapAttrs' (
+                slug: entry: lib.nameValuePair "amo-${slug}" (addons.mkAddon entry)
+              ) addons.catalog
+              // {
+                bat-theme = batThemeSrc;
+              }
+            )
+          );
 
         json-schema =
           pkgs.runCommand "json-schema"

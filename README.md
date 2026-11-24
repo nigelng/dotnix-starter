@@ -2,7 +2,7 @@
 
 [![Flake check](https://github.com/nigelng/dotnix-starter/actions/workflows/flake.yml/badge.svg)](https://github.com/nigelng/dotnix-starter/actions/workflows/flake.yml)
 
-Nix flake template for macOS (Apple Silicon): [nix-darwin](https://github.com/LnL7/nix-darwin) for the system and [home-manager](https://github.com/nix-community/home-manager) for user config. App lists: shared packages in `config/apps/base.json`, per-host extras in `config/apps/hosts/<hostname>.json` (merged at build time). Profile settings in `config/user.json`, git in `config/git.json`; per-machine settings (including `adminUsername`) in `config/hosts/<hostname>.json`.
+Nix flake template for macOS (Apple Silicon): [nix-darwin](https://github.com/nix-darwin/nix-darwin) for the system and [home-manager](https://github.com/nix-community/home-manager) for user config. App lists: shared packages in `config/apps/base.json`, per-host extras in `config/apps/hosts/<hostname>.json` (merged at build time). Profile settings in `config/user.json`, git in `config/git.json`; per-machine settings (including `adminUsername`) in `config/hosts/<hostname>.json`.
 
 This template is designed to work standalone **and** as a flake overlay — a private repo can import `homeModules` and `darwinModules` from this flake and extend them with personal config (see [Using as a flake overlay](#using-as-a-flake-overlay)).
 
@@ -80,7 +80,7 @@ Uppercase `G*` shortcuts come from zimfw's `git` module (`zmodule git` in `home/
 
 **Pinned inputs** (see `flake.lock`):
 
-- `nixpkgs` — `nixos-26.05` (single package set for system and home-manager)
+- `nixpkgs` — `nixpkgs-26.05-darwin` (single package set for system and home-manager; this Darwin branch only advances once its Darwin Hydra jobs pass, so it is gated on Darwin builds)
 - `darwin` — `nix-darwin-26.05`
 - `home-manager` — `release-26.05`
 
@@ -186,7 +186,7 @@ nix fmt              # format *.nix (flake formatter = nixfmt-tree / treefmt)
 nix fmt -- --ci      # verify formatting (CI uses this; treefmt CI mode)
 nix run '.#check'    # runs nix flake check (may warn once if repo is dirty)
 nix flake check      # direct; use after committing for quiet output
-nix build --no-link '.#checks.aarch64-darwin.lib-tests'  # also: fmt, shellcheck, json-schema (see CI)
+nix build --no-link '.#checks.aarch64-darwin.lib-tests'  # also: fmt, shellcheck, json-schema, pinned-sources (see CI)
 bash scripts/test-correctness.sh schema   # schema/assertion regressions (also part of `all`)
 nix flake update     # bump input pins (commit flake.lock when intentional)
 nix run '.#changelog'           # nix-darwin stateVersion notes (defaultHost)
@@ -301,7 +301,7 @@ All settings are consumer-overridable via `my.firefox.settings` (Nix) or per-hos
 
 **How extensions are installed:**
 
-By default (`my.firefox.extensionInstallMode = "policy"`), add-ons are installed via `programs.firefox.policies.ExtensionSettings` (`force_installed` + pinned AMO **file** URLs from the catalog / `manual` entries). home-manager writes these into Darwin defaults (`org.mozilla.firefox.plist`) so Homebrew Firefox applies them. First launch (or restart after switch) needs network so Firefox can fetch the XPIs. Extension auto-update prefs stay off — bump catalog/manual URLs intentionally to change versions (see [docs/SECURITY.md](docs/SECURITY.md)).
+By default (`my.firefox.extensionInstallMode = "policy"`), add-ons are installed via `programs.firefox.policies.ExtensionSettings` (`force_installed` + pinned AMO **file** URLs from the catalog / `manual` entries). home-manager writes these into Darwin defaults (`org.mozilla.firefox.plist`) so Homebrew Firefox applies them. First launch (or restart after switch) needs network so Firefox can fetch the XPIs. Extension auto-update prefs stay off. Catalog pins (`home/firefox/addons-pins.json`) are refreshed by `scripts/update-pins.sh` in the weekly update PR; `manual` URLs stay hand-bumped (see [docs/SECURITY.md](docs/SECURITY.md)).
 
 Official Firefox builds ignore new profile-directory XPI sideloads, so the old `home.file` symlink path is not the default.
 
@@ -414,7 +414,7 @@ This template exposes `homeModules` and `darwinModules` as flake outputs so a pr
 | `editorTooling`                  | Built editor tooling attrset, or `{}` when inputs are absent                                                                                                              |
 | `mkWritableCopyActivation`       | Helper for writable-copy activation scripts (pass into `darwinConfigurationsBuilder`)                                                                                     |
 | `darwinConfigurationsBuilder`    | The `darwin/default.nix` function — call with your own config loaders, `extraHomeModules`, and `extraDarwinModules` (extra nix-darwin modules spliced into every host's `modules`; default `[ ]`) |
-| `overlayFlakeOutputs`            | Shared `apps` / `checks` / `formatter` / `devShell` helper used by this flake (the starter-only checks `lib-tests`, `fmt`, `shellcheck`, `json-schema` are not included)    |
+| `overlayFlakeOutputs`            | Shared `apps` / `checks` / `formatter` / `devShell` helper used by this flake (the starter-only checks `lib-tests`, `fmt`, `shellcheck`, `json-schema`, `pinned-sources` are not included)    |
 | `overlays.google-fonts`          | The google-fonts nixpkgs overlay                                                                                                                                          |
 | `pkgsForValidation`              | nixpkgs with google-fonts overlay for app/font validation (`allowUnfree = true`, matching darwin)                                                                         |
 | `validateApps`                   | App/font/Firefox-slug/Android JDK validation for overlay checks                                                                                                           |
@@ -430,7 +430,7 @@ An overlay repo builds its `darwinConfigurations` using only the starter's expor
 ```nix
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-26.05-darwin";
 
     home-manager.follows = "dotnix-starter/home-manager";
     darwin.follows = "dotnix-starter/darwin";
@@ -535,9 +535,9 @@ For overlays that need full control over `darwinSystem` modules:
 ```nix
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-26.05-darwin";
     home-manager.url = "github:nix-community/home-manager/release-26.05";
-    darwin.url = "github:LnL7/nix-darwin/nix-darwin-26.05";
+    darwin.url = "github:nix-darwin/nix-darwin/nix-darwin-26.05";
     dotnix-starter.url = "github:nigelng/dotnix-starter";
     prettier-config = {
       url = "github:nigelng/prettier-config";
@@ -711,12 +711,12 @@ Do not create a private/paid cache for this template — macos overlays should r
 
 GitHub Actions on `macos-14` (Apple Silicon; update the runner image when validating newer macOS — see [docs/MACOS-27.md](docs/MACOS-27.md)):
 
-- **Evaluate flake** — verifies every host in `config/hosts.json` has matching JSON under `config/hosts/`, `config/apps/hosts/`, `config/fonts/hosts/`, and (when present) Firefox/Android hosts; validates against `config/schema/*.schema.json`; then `nix flake check --no-build` (includes app/font package name and Firefox slug validation); then `nix build` of the starter-only checks `lib-tests`, `fmt`, `shellcheck` and `json-schema`; then `scripts/test-correctness.sh all` (app fallbacks, GC schedule, Android lists/schema, Git includes and the 1Password signing gate, zsh init guards and baked `op` completion, `example-mac` host defaults, the `schema` case (schema accept/reject, user-list and https assertions, Firefox `enable` wiring, validator `defaultHost` check), Cursor pinned-extension installer, install wrapper).
+- **Evaluate flake** — verifies every host in `config/hosts.json` has matching JSON under `config/hosts/`, `config/apps/hosts/`, `config/fonts/hosts/`, and (when present) Firefox/Android hosts; validates against `config/schema/*.schema.json`; then `nix flake check --no-build` (includes app/font package name and Firefox slug validation); then `nix build` of the starter-only checks `lib-tests`, `fmt`, `shellcheck`, `json-schema` and `pinned-sources`; then `scripts/test-correctness.sh all` (app fallbacks, GC schedule, Android lists/schema, Git includes and the 1Password signing gate, zsh init guards and baked `op` completion, `example-mac` host defaults, the `schema` case (schema accept/reject, user-list and https assertions, Firefox `enable` wiring, validator `defaultHost` check), Cursor pinned-extension installer, install wrapper).
 - **Nix formatting** — dedicated job: `nix fmt -- --ci` (flake formatter is `pkgs.nixfmt-tree` / treefmt).
-- **Starter flake checks** (`flake.nix`, `checks.aarch64-darwin`; starter only, not part of `overlayFlakeOutputs`): `lib-tests` (`tests/lib.nix` merge-function tests and the schema-to-loader drift test), `fmt` (`treefmt --ci`), `shellcheck` (`scripts/*.sh`, `build-darwin.sh`) and `json-schema` (all eight schemas present, then `validate-host-json` on the tree). `nix flake check --no-build` evaluates them; the CI `eval` job builds them explicitly. Run one locally with `nix build --no-link '.#checks.aarch64-darwin.lib-tests'`.
+- **Starter flake checks** (`flake.nix`, `checks.aarch64-darwin`; starter only, not part of `overlayFlakeOutputs`): `lib-tests` (`tests/lib.nix` merge-function tests and the schema-to-loader drift test), `fmt` (`treefmt --ci`), `shellcheck` (`scripts/*.sh`, `build-darwin.sh`), `json-schema` (all eight schemas present, then `validate-host-json` on the tree) and `pinned-sources` (builds every pinned fetch: google-fonts, VSIX, AMO add-ons, bat theme). `nix flake check --no-build` evaluates them; the CI `eval` job builds them explicitly. Run one locally with `nix build --no-link '.#checks.aarch64-darwin.lib-tests'`.
 - **Per-host build** (`.github/workflows/flake.yml`) — matrix derived from `config/hosts.json`: builds `.#checks.aarch64-darwin.<host>`.
 - **shellcheck** — `scripts/*.sh` and `build-darwin.sh` on Ubuntu.
-- **Update flake inputs** (`.github/workflows/update-flake.yml`) — weekly (and manual) `nix flake update` with eval check and an automated PR; full host builds run on the PR via `flake.yml`.
+- **Update flake inputs** (`.github/workflows/update-flake.yml`) — weekly (and manual) `nix flake update`, `scripts/update-pins.sh all` (pins sidecars), and the editor-tooling lock refresh, with eval check and an in-workflow build of `example-mac` and `pinned-sources`; the result opens as an automated PR. Full host builds also run on the PR via `flake.yml`.
 - **Dependabot** (`.github/dependabot.yml`) — weekly GitHub Actions dependency updates (workflows pin Actions by commit SHA).
 
 Linux runners cannot build this flake; CI must stay on macOS.

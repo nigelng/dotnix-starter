@@ -1,0 +1,11 @@
+{
+  "guid": "browserassistant@adguard.com",
+  "slug": "x",
+  "current_version": {
+    "version": "1",
+    "file": {
+      "url": "https://addons.mozilla.org/firefox/downloads/file/4549017/adguard_browser_assistant-1.4.8.xpi",
+      "hash": "sha1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  }
+}

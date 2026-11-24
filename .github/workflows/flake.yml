@@ -37,7 +37,7 @@ jobs:
 
   eval:
     runs-on: macos-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Checkout
         # actions/checkout@v7
@@ -73,6 +73,7 @@ jobs:
           .#checks.aarch64-darwin.fmt
           .#checks.aarch64-darwin.shellcheck
           .#checks.aarch64-darwin.json-schema
+          .#checks.aarch64-darwin.pinned-sources
 
       - name: Run correctness regressions
         # app fallbacks, weekly GC, Android lists/schema, Git includes + 1Password signing gate,

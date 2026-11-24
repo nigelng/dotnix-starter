@@ -1,0 +1,32 @@
+{
+  "darkreader": {
+    "name": "darkreader",
+    "addonId": "addon@darkreader.org",
+    "url": "https://addons.mozilla.org/firefox/downloads/file/5216111/darkreader-4.9.135.xpi",
+    "hash": "sha256-v+1FkdbMaYV/XtM6LTy/vFgR1bksQyPQc10vF1fi3OQ="
+  },
+  "onepassword-x-password-manager": {
+    "name": "onepassword-x-password-manager",
+    "addonId": "{d634138d-c276-4fc8-924b-40a0ea21d284}",
+    "url": "https://addons.mozilla.org/firefox/downloads/file/5266358/1password_x_password_manager-8.12.46.29.xpi",
+    "hash": "sha256-wQQm1/CRpRjsbJMVJAnJmi1EVE5IeniEwAwrNt9CwTQ="
+  },
+  "adguard-adblocker": {
+    "name": "adguard-adblocker",
+    "addonId": "adguardadblocker@adguard.com",
+    "url": "https://addons.mozilla.org/firefox/downloads/file/5229923/adguard_adblocker-5.5.4.55.xpi",
+    "hash": "sha256-k33YEwsRndj8qhv0hkUogOY6abVwR7pEjRP6HXUGTO4="
+  },
+  "adguard-browser-assistant": {
+    "name": "adguard-browser-assistant",
+    "addonId": "browserassistant@adguard.com",
+    "url": "https://addons.mozilla.org/firefox/downloads/file/5065097/adguard_browser_assistant-1.4.27.xpi",
+    "hash": "sha256-dltWdyQfBo785zRtrft6T3BNASdN6EEVqIYUyyqKV4o="
+  },
+  "privacy-badger17": {
+    "name": "privacy-badger17",
+    "addonId": "jid1-MnnxcxisBPnSXQ@jetpack",
+    "url": "https://addons.mozilla.org/firefox/downloads/file/5032646/privacy_badger17-2026.9.15.xpi",
+    "hash": "sha256-l82JEeNIbaNKUyp8fygGzW0M+hF6H75eh0cEKpRELWI="
+  }
+}

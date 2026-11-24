@@ -40,7 +40,6 @@ in
       # The assertions below reject unsafe entries in the final merged lists.
       trusted-users = [ userConfig.user ] ++ systemConfig.trustedUsers;
       allowed-users = [ userConfig.user ] ++ systemConfig.allowedUsers;
-      auto-optimise-store = true;
       experimental-features = [
         "nix-command"
         "flakes"
@@ -57,6 +56,17 @@ in
         Minute = 0;
       };
       options = "--delete-older-than 14d";
+    };
+
+    optimise = {
+      # Replaces auto-optimise-store (inline dedup on every build); a weekly pass is safer on macOS
+      automatic = true;
+      # Sunday 04:00 local time, an hour after gc (launchd StartCalendarInterval; Weekday 0 = Sunday)
+      interval = {
+        Weekday = 0;
+        Hour = 4;
+        Minute = 0;
+      };
     };
   };
 

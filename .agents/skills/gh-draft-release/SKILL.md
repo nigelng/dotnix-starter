@@ -11,7 +11,7 @@ disable-model-invocation: true
 
 # gh-draft-release
 
-**User prompts:** `AskQuestion` when available; otherwise ask conversationally.
+**User prompts:** the question tool (`AskQuestion`/`AskUserQuestion`/`ask_user_question`) when available; otherwise ask conversationally.
 
 **When to use this vs `/gh-tag-release`:**
 - `/gh-draft-release` (this skill) — create a **draft** GitHub Release with generated notes from unreleased commits. Does **not** push a tag or trigger publish. User publishes the draft manually.
@@ -26,26 +26,25 @@ disable-model-invocation: true
 
 ### 0. Resolve default branch
 
+`<skill-dir>` is the absolute directory of this `SKILL.md`.
+
 ```bash
-gh repo view --json defaultBranchRef -q .defaultBranchRef.name
+bash <skill-dir>/../commit/scripts/git-preflight.sh state
 ```
 
-Use that name (e.g. `main` or `master`) everywhere below as `<default>`. Do **not** hardcode `main` / `origin/main`.
+Use `default=` as `<default>`. If it is empty, stop and ask. Do **not** hardcode `main` / `origin/main`.
 
 ### 1. Handle uncommitted changes
 
-```bash
-git status --short
-ORIG=$(git branch --show-current)
-```
-
-Record `<orig>` from `ORIG` (the branch to restore after the draft). Prefer **stash** on every branch (including feature branches):
+`<orig>` is `branch=` from step 0 (restored after the draft). `clean=no` → offer stash only. `clean=yes` → proceed (still keep `<orig>`). Prefer **stash** on every branch (including feature branches):
 
 ```bash
 git stash push -m "gh-draft-release-wip"
 ```
 
-Do **not** create a WIP commit. Offer stash only. If no changes, proceed (still keep `<orig>` for restore).
+Do **not** create a WIP commit. If no changes, proceed.
+
+From here, every stop after this step runs **Restore** first.
 
 ### 2. Switch to default branch
 
@@ -55,31 +54,27 @@ git checkout <default>
 
 ### 3. Sync default branch
 
-Release notes must only describe commits that the remote release target includes. Sync once:
+Release notes must only describe commits the remote release target includes. Sync once:
 
 ```bash
 git pull --ff-only
-git status -sb
-git rev-parse HEAD
-git rev-parse origin/<default>
+bash <skill-dir>/../commit/scripts/git-preflight.sh state
 ```
 
-Require local `<default>` == `origin/<default>` (same commit).
+Require `branch=<default>`, `upstream=origin/<default>`, `ahead=0`, and `behind=0`.
 
-- If local is **ahead** / has unpushed commits: stop, or user prompts whether to push first. Do not create a release whose notes describe commits the remote target does not include.
-- If `git pull --ff-only` fails (diverged / non-ff): stop and inform the user; do not force-rebase unless they explicitly ask.
-- If they match: proceed.
+- `ahead` greater than 0: stop, or ask whether to push first.
+- `git pull --ff-only` fails, or `behind` greater than 0: stop; do not force-rebase unless they explicitly ask.
+- Those four hold: proceed.
 
 ### 4. Detect unreleased changes
 
 ```bash
-git describe --tags --abbrev=0
-git log <latest-tag>..HEAD --oneline
+bash <skill-dir>/../commit/scripts/git-preflight.sh version
+git log <last_tag>..HEAD --oneline
 ```
 
-If no tags exist, all commits are unreleased.
-
-If there are no commits since the latest tag, inform the user "nothing to release" and stop.
+Empty `last_tag=` → all commits are unreleased. No commits since `last_tag` → "nothing to release" and stop.
 
 ### 5. Generate release notes
 
@@ -89,20 +84,18 @@ Otherwise, from commits since the last tag, group by conventional commit type (`
 
 ### 6. Suggest a release tag
 
-- If `package.json` exists, read the `version` field and suggest `v<version>` as the tag (e.g. `v0.1.0`).
-- If `package.json` is missing, user prompts for the tag (or infer from the latest tag / CHANGELOG when obvious). Do not invent a version silently.
-- Present the tag and release note for approval (user prompts).
+Use `manifest=` from step 4's `version` output (re-run `version` if skipped). Non-empty → suggest `v<manifest>`. Empty → ask for the tag (or infer from `last_tag` / CHANGELOG when obvious). Do not invent a version silently. Present the tag and notes for approval.
 
 ### 7. Check existing tag / release
 
 Before creating, verify the suggested tag is free:
 
 ```bash
-git rev-parse "v<version>" 2>/dev/null && echo "tag-exists" || echo "tag-free"
+bash <skill-dir>/../commit/scripts/git-preflight.sh version v<version>
 gh release view "v<version>" 2>/dev/null && echo "release-exists" || echo "release-free"
 ```
 
-If the tag or release already exists, stop or user prompts whether to bump the version — do not overwrite or recreate.
+`local_tag=yes`, `remote_tag=yes`, or release-exists → stop or ask whether to bump. `remote_tag=unknown` (cannot verify) → stop and report. Do not overwrite or recreate.
 
 ### 8. Create draft GitHub Release
 
@@ -120,11 +113,11 @@ Share the release URL with the user.
 
 ### 9. Revisions
 
-If the user requests changes to the tag or release note, revise and repeat from step 6 (re-run steps 3 and 7 before create).
+On requested changes, revise and repeat from step 6 (re-run steps 3 and 7 before create).
 
-## Post-release
+## Restore
 
-After the release is created (or if the workflow stops early), restore the working state:
+Run on success and on every stop after step 1:
 
 ```bash
 git checkout <orig> && git stash pop

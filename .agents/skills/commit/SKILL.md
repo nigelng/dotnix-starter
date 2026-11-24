@@ -14,13 +14,13 @@ Scan the current working-tree changes, update docs and version when appropriate,
 
 Session/Task tiers: [model-tiers.md](model-tiers.md) (`top`/`mid`/`low`). `/commit` defaults to `low` (use `mid` for large mixed trees or version + CHANGELOG judgment).
 
-**AskQuestion:** when available, use it for approvals; otherwise ask conversationally.
+**The question tool** (`AskQuestion`/`AskUserQuestion`/`ask_user_question`): when available, use it for approvals; otherwise ask conversationally.
 
 ## Preconditions
 
 - User explicitly asked to commit (this skill does not commit on its own initiative).
 - Do not commit files that likely contain secrets (`.env`, credentials, tokens). Warn the user if they request those.
-- **Plans and brainstorms:** never stage or commit `docs/brainstorms/**` (local `/brainstorm` artifacts). Stage `docs/plans/**` only when `git check-ignore -q docs/plans/<file>` fails (path is tracked-eligible) **and** the plan belongs to this change; if `check-ignore` succeeds, leave that plan unstaged. Include eligible plans in the commit plan when they are part of the diff.
+- **Plans and brainstorms:** never stage or commit `docs/brainstorms/**` (local `/brainstorm` artifacts). Stage `docs/plans/**` only when `git check-ignore -q docs/plans/<file>` fails **and** the plan belongs to this change; if `check-ignore` succeeds, leave that plan unstaged. Include eligible plans in the commit plan when they are part of the diff.
 
 ## Workflow
 
@@ -57,7 +57,7 @@ Match the repo's recent commit style from `git log`.
 If the diff spans multiple distinct change types (e.g. `feat` + `chore` + `docs`), suggest splitting into multiple commits grouped by change type:
 
 - Present a commit plan as a list of proposed commits, each with its type, summary, and the files it covers.
-- Wait for user approval of the plan via AskQuestion.
+- Wait for user approval of the plan via the question tool.
 - On approval, process each group through steps 4–9 (step 9 is the commit).
 - If the user requests changes to the plan, revise and re-present.
 
@@ -92,23 +92,32 @@ chore: bump node to 24 and update jest config
 
 ### 5. Propose version bump
 
-If a `package.json` exists (or equivalent package manifest like `pyproject.toml`, `Cargo.toml`), compute **one** proposed version for the whole `/commit` session from the highest-priority commit type in the plan, using semantic versioning:
+`<skill-dir>` is the absolute directory of this `SKILL.md`.
 
-- `BREAKING CHANGE` or `!:` → major (e.g. 1.2.3 → 2.0.0)
-- `feat:` → minor (e.g. 1.2.3 → 1.3.0)
-- `fix:` → patch (e.g. 1.2.3 → 1.2.4)
-- `chore:`, `refactor:`, `docs:`, `style:`, `perf:`, `test:`, `build:`, `ci:`, `revert:` → no version change
+```bash
+bash <skill-dir>/scripts/git-preflight.sh version
+```
+
+Empty `manifest=` → no package manifest; skip this step. Otherwise one proposal for the session, from the highest-priority commit type (`<last_tag>` is `last_tag=` when it ends in `x.y.z`, else omit):
+
+```bash
+bash <skill-dir>/scripts/git-preflight.sh bump <type> [<last_tag>]
+```
+
+`<type>` is `major` (`BREAKING CHANGE` or `!:`), else `feat`, else `fix`, else `none` (`chore`, `refactor`, `docs`, `style`, `perf`, `test`, `build`, `ci`, `revert`). `bump=none` → no version change. Otherwise `to=` is the proposal.
 
 **Apply rules:**
-1. Propose the version once for the session; apply it only on the **first** commit in a multi-commit plan.
-2. If CHANGELOG has a versioned unreleased heading (`## [x.y.z] — unreleased`), skip proposing/applying only when that `x.y.z` is already at or past the proposed version (from last tag via `git describe --tags --abbrev=0`). A bare `## [Unreleased]` does **not** skip — still propose when the commit type warrants a bump. If an existing versioned heading is below the proposed bump, propose the higher version (and update the heading).
-3. Skip if the package manifest version is already at or past the proposed version since the last tag (`git describe --tags --abbrev=0`).
+1. Propose once for the session; apply only on the **first** commit in a multi-commit plan.
+2. If `changelog_version=` is set, skip proposing/applying only when that version is already at or past `to=` (`last_tag=` is the comparison point). A bare `## [Unreleased]` leaves `changelog_version` empty and does **not** skip. If `changelog_version` is below `to=`, propose `to=` and update the heading.
+3. Skip only when `skip=yes` (`manifest=` ≥ `to=`).
 
-Present the suggested version to the user for approval via AskQuestion. If the user declines, skip the version change.
+`bump` exit 2 (base not `x.y.z`) → no proposal; skip this step.
+
+Present `to=` for approval via the question tool. If the user declines, skip the version change.
 
 ### 6. Update CHANGELOG
 
-If a `CHANGELOG.md` exists, prepend a new entry under the canonical unreleased heading (reuse an existing top unreleased heading rather than duplicating it):
+If a `CHANGELOG.md` exists, prepend a new entry under the canonical unreleased heading (reuse an existing top unreleased heading):
 
 - Version change applied in Step 5, **or** `CHANGELOG.md` already has `## [x.y.z] — unreleased`: use `## [x.y.z] — unreleased` (when bumping, upgrade an existing bare `## [Unreleased]` or lower versioned unreleased heading in place).
 - Neither applies: use `## [Unreleased]` (prepend under an existing `## [Unreleased]` if present).
@@ -122,11 +131,11 @@ If no `CHANGELOG.md` exists, skip this step — do not create one.
 
 ### 7. Update README
 
-If the changes affect documented features, configuration options, usage examples, or any content covered in `README.md`, suggest updates to keep it in sync. Present the proposed README changes to the user for approval. If no updates are needed, skip this step.
+If the changes affect documented features, configuration options, usage examples, or any content covered in `README.md`, suggest updates to keep it in sync. Present the proposed README changes for approval. If no updates are needed, skip this step.
 
 ### 8. Present for review
 
-Present the proposed commit message, proposed version (if any), changelog diff, and README diff (if any) to the user for review via AskQuestion (approve / revise / cancel). **Do not commit until the user approves.**
+Present the commit message, version (if any), changelog diff, and README diff (if any) for review via the question tool (approve / revise / cancel). **Do not commit until the user approves.**
 
 If the user requests changes, revise and repeat this step.
 
@@ -147,7 +156,7 @@ EOF
 git status
 ```
 
-Stage from the repo root so approved changes are included (including any approved version/CHANGELOG/README edits). Exclude secret files if any were flagged. If a version change was applied, include it in the same commit.
+Stage from the repo root so approved changes are included (including approved version/CHANGELOG/README edits). Exclude flagged secret files. If a version change was applied, include it in the same commit.
 
 ### 10. Hook failure and amend
 

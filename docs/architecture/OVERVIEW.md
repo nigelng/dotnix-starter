@@ -68,7 +68,7 @@ Merge semantics: lists are unioned and deduplicated, maps are host-wins per key,
 | `json-schema` flake check | all eight schemas exist, then `validate-host-json` on the tree | CI `eval` job |
 | `<host>` flake check | builds the full system closure | CI per-host matrix |
 | `validate-host-json.sh` | hosts/user/git (each only when schema and file exist), then per-host host/apps/fonts/firefox/android; `defaultHost` in `hosts` | CI `eval` job, `nix run '.#validate-host-json'`, overlays via `SCHEMA_ROOT` |
-| `scripts/test-correctness.sh` | cases `apps`, `gc`, `android`, `git`, `shell`, `host`, `schema`, `cursor`, `wrapper`, `all` | CI `eval` job, pre-commit |
+| `scripts/test-correctness.sh` | cases `apps`, `gc`, `android`, `git`, `shell`, `host`, `schema`, `cursor`, `wrapper`, `release`, `all` | CI `eval` job, pre-commit |
 
 The `schema` case checks schema accept/reject (user lists, https add-ons, `hosts`), the validator's `defaultHost` rejection on a temp copy, the nix-darwin and home-manager assertions via `extendModules`, and the Firefox `enable` wiring.
 

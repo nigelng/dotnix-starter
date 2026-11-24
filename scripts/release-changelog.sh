@@ -55,6 +55,10 @@ strip_v() {
   printf '%s' "${1#v}"
 }
 
+is_semver() {
+  [[ "$(strip_v "$1")" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+}
+
 is_skipped_subject() {
   local subject="$1"
   local pattern
@@ -86,6 +90,10 @@ bump_semver() {
   local bump="$2"
   local ver major minor patch
 
+  if ! is_semver "$current"; then
+    echo "Invalid semver: $current (expected vX.Y.Z)" >&2
+    return 1
+  fi
   ver="$(strip_v "$current")"
   IFS=. read -r major minor patch <<< "$ver"
   case "$bump" in

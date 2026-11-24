@@ -19,4 +19,4 @@ repos:
         entry: nix develop --command bash scripts/test-correctness.sh all
         language: system
         pass_filenames: false
-        files: ^(lib/|darwin/|home/|config/|tests/|flake\.(nix|lock)$|build-darwin\.sh$|scripts/(test-correctness|validate-host-json)\.sh$)
+        files: ^(lib/|darwin/|home/|config/|tests/|flake\.(nix|lock)$|build-darwin\.sh$|scripts/(test-correctness|validate-host-json|release-changelog)\.sh$)

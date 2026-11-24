@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Focused regression checks for default-install and JSON-config correctness.
 #
-# Usage: scripts/test-correctness.sh [apps|gc|android|git|shell|host|schema|cursor|wrapper|all]
+# Usage: scripts/test-correctness.sh [apps|gc|android|git|shell|host|schema|cursor|wrapper|release|all]
 #   (default: all). Run from anywhere; the repo root is derived from this file.
 #
 # Tools (nix, jq, python3 jsonschema) are only required by the cases that use
@@ -1390,10 +1390,39 @@ test_cursor() {
   check_cursor_run
 }
 
+# --- case: release -----------------------------------------------------------
+# scripts/release-changelog.sh --bump: pure string handling, no git-cliff needed.
+
+check_bump() { # label expected tag type
+  check_eq "release: $1" "$2" "$("$ROOT/scripts/release-changelog.sh" --bump "$3" "$4")"
+}
+
+check_bump_rejected() { # label tag type
+  local out rc=0
+  out="$("$ROOT/scripts/release-changelog.sh" --bump "$2" "$3" 2>&1)" || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    pass "release: $1"
+  else
+    fail "release: $1" "expected non-zero exit, got 0" "output: $out"
+  fi
+}
+
+test_release() {
+  check_bump "patch bump" v1.2.4 v1.2.3 patch
+  check_bump "minor bump resets patch" v1.3.0 v1.2.3 minor
+  check_bump "major bump resets minor and patch" v2.0.0 v1.2.3 major
+  check_bump "tag without v prefix is accepted" v1.2.4 1.2.3 patch
+  check_bump_rejected "two-part version is rejected" v1.2 patch
+  check_bump_rejected "pre-release suffix is rejected" v1.2.3-rc1 patch
+  check_bump_rejected "shell metacharacters are rejected" 'v1.2.3;id' patch
+  check_bump_rejected "empty tag is rejected" "" patch
+  check_bump_rejected "unknown bump type is rejected" v1.2.3 foo
+}
+
 # --- entry point ----------------------------------------------------------------
 
 usage() {
-  echo "usage: ${0##*/} [apps|gc|android|git|shell|host|schema|cursor|wrapper|all]"
+  echo "usage: ${0##*/} [apps|gc|android|git|shell|host|schema|cursor|wrapper|release|all]"
 }
 
 summary() {
@@ -1412,6 +1441,7 @@ main() {
     schema) test_schema ;;
     cursor) test_cursor ;;
     wrapper) test_wrapper ;;
+    release) test_release ;;
     all)
       test_wrapper
       test_apps
@@ -1422,6 +1452,7 @@ main() {
       test_host
       test_schema
       test_cursor
+      test_release
       ;;
     -h | --help)
       usage

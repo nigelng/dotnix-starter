@@ -72,6 +72,7 @@ in
 
   devShells.${system}.default = pkgs.mkShell {
     packages = [
+      pkgs.git-cliff
       pkgs.jq
       pkgs.nix
       pkgs.nixfmt

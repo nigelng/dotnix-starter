@@ -19,12 +19,15 @@ concurrency:
 jobs:
   setup:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       hosts: ${{ steps.hosts.outputs.hosts }}
     steps:
       - name: Checkout
         # actions/checkout@v7
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
 
       - name: Derive host matrix from config/hosts.json
         id: hosts
@@ -39,6 +42,8 @@ jobs:
       - name: Checkout
         # actions/checkout@v7
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
 
       - name: Install Nix
         # DeterminateSystems/nix-installer-action@v22
@@ -71,7 +76,7 @@ jobs:
 
       - name: Run correctness regressions
         # app fallbacks, weekly GC, Android lists/schema, Git includes + 1Password signing gate,
-        # zsh init guards, example-mac host defaults, Cursor installer, install wrapper
+        # zsh init guards, example-mac host defaults, Cursor installer, install wrapper, release semver guard
         run: nix develop --command bash scripts/test-correctness.sh all
 
   fmt:
@@ -81,6 +86,8 @@ jobs:
       - name: Checkout
         # actions/checkout@v7
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
 
       - name: Install Nix
         # DeterminateSystems/nix-installer-action@v22
@@ -100,16 +107,20 @@ jobs:
 
   shellcheck:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         # actions/checkout@v7
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
 
-      - name: Install shellcheck
-        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: Install Nix
+        # DeterminateSystems/nix-installer-action@v22
+        uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa
 
       - name: Run shellcheck
-        run: shellcheck scripts/*.sh build-darwin.sh
+        run: nix develop --command shellcheck scripts/*.sh build-darwin.sh
 
   check:
     needs:
@@ -125,6 +136,8 @@ jobs:
       - name: Checkout
         # actions/checkout@v7
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
 
       - name: Install Nix
         # DeterminateSystems/nix-installer-action@v22
@@ -139,4 +152,6 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Build host check
-        run: nix build --option warn-dirty false '.#checks.aarch64-darwin.${{ matrix.host }}'
+        env:
+          HOST: ${{ matrix.host }}
+        run: nix build --option warn-dirty false ".#checks.aarch64-darwin.${HOST}"

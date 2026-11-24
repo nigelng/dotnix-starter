@@ -78,7 +78,7 @@ nix-darwin does **not** manage disk encryption or Gatekeeper assessment policy. 
 - Shellcheck in CI runs from the flake devShell.
 - No workflow expands `${{ }}` inline in a `run:` block. Inputs, step outputs and matrix values reach scripts through `env:` (or the runner's default variables such as `GITHUB_REPOSITORY`), which avoids template injection.
 - `flake.yml`, `update-flake.yml` and `vendor-check.yml` checkouts set `persist-credentials: false` (`update-flake.yml` pushes via `create-pull-request`'s own `token:` input); `release.yml` keeps the token because it pushes the changelog branch with `git push`.
-- Every `flake.yml` and `update-flake.yml` job sets `timeout-minutes`.
+- Every job in every workflow sets `timeout-minutes`.
 - Starter-only flake checks (`lib-tests`, `fmt`, `shellcheck`, `json-schema`) run in CI so schema and trust-rule regressions fail closed; see [architecture/OVERVIEW.md](architecture/OVERVIEW.md).
 - Eval/fmt/check jobs set up the free public **`dotnix-starter`** Cachix cache after nix-installer (`CACHIX_AUTH_TOKEN`). The step uses `continue-on-error` so missing cache/token soft-fails and jobs still proceed.
 - Release / update-flake workflows need write permissions (or `WORKFLOW_PAT`); scope the PAT tightly and review ruleset exemptions.

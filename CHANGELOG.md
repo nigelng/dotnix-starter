@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
 
+## [1.2.0] - 2026-11-26
+
+### Breaking
+
+- refresh manual pins weekly and track nixpkgs-26.05-darwin (#63)
+
+
+### Added
+
+
+### Changed
+
+- replace pre-commit with prek to drop dotnet from host closure (#65)
+
+- update flake inputs and pins (#64)
+
+- release: resolve git-cliff from locked nixpkgs on linux runner (#66)
+
+
+
+
 ## [1.1.0] - 2026-11-23
 
 

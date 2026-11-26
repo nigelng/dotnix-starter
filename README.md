@@ -663,11 +663,11 @@ Automatic GC is enabled via a launchd job that runs weekly on Sunday at 03:00 lo
 
 ### Pre-commit (optional)
 
-[pre-commit](https://pre-commit.com/) and `shellcheck` are installed as user packages via `config/apps/base.json`, so after a rebuild you can enable the hooks for fast feedback before push:
+[prek](https://github.com/j178/prek) (a fast, drop-in [pre-commit](https://pre-commit.com/) runner that reads `.pre-commit-config.yaml`) and `shellcheck` are installed as user packages via `config/apps/base.json`, so after a rebuild you can enable the hooks for fast feedback before push:
 
 ```sh
-pre-commit install
-pre-commit run --all-files
+prek install
+prek run --all-files
 ```
 
 Hooks (see `.pre-commit-config.yaml`): **`nix fmt`** (writes, then `nix fmt -- --ci`) on `*.nix`, `shellcheck` on `scripts/*.sh` and `build-darwin.sh`, and `scripts/test-correctness.sh all` when `lib/`, `darwin/`, `home/`, `config/`, `flake.nix`/`flake.lock`, `build-darwin.sh` or the harness changes. Agents must also run `nix fmt` before committing Nix (see [AGENTS.md](AGENTS.md) and `.cursor/rules/nixfmt.mdc`). Not required for CI beyond the flake `fmt` job.

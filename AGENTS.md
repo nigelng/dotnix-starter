@@ -50,6 +50,6 @@ chore: update flake inputs
 ## Local hooks
 
 ```sh
-pre-commit install
-pre-commit run --all-files
+prek install
+prek run --all-files
 ```

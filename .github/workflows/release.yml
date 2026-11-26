@@ -62,12 +62,14 @@ jobs:
         # DeterminateSystems/nix-installer-action@v22
         uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa
 
-      - name: Resolve git-cliff from the flake devShell
+      - name: Resolve git-cliff from the locked nixpkgs
+        # The devShell is aarch64-darwin only, so take git-cliff from the flake's
+        # locked nixpkgs input instead (same pin, works on this Linux runner).
         # Resolve once so later steps call release-changelog.sh directly; a failing
-        # `nix develop` fails here instead of reading as false inside an `if` test.
+        # `nix shell` fails here instead of reading as false inside an `if` test.
         run: |
           set -euo pipefail
-          bin="$(nix develop --command bash -c 'command -v git-cliff')"
+          bin="$(nix shell --inputs-from . nixpkgs#git-cliff --command bash -c 'command -v git-cliff')"
           if [[ "$bin" != /nix/store/* || ! -x "$bin" ]]; then
             echo "::error::git-cliff did not resolve to a Nix store path: ${bin}"
             exit 1
